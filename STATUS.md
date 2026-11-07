@@ -29,10 +29,11 @@ still failing. `DELIVERY.md` has been removed; the corrections are recorded in
 **Reconciliation engine** — [`src/domain/reconcile.js`](src/domain/reconcile.js).
 Three tolerance rules, pure and framework-free, fully tested.
 
-**Ward Admin** — [`src/pages/AdminDashboard.jsx`](src/pages/AdminDashboard.jsx).
-Data-driven transit map over a cadastral grid, discrepancy review queue, and an
-append-only audit trail. The project detail shows all three sources of truth and
-the output of every rule, including the ones that passed.
+**Ward Officer** — [`src/pages/AdminDashboard.jsx`](src/pages/AdminDashboard.jsx).
+A delivery-against-sanction chart (worst-first), the discrepancy review queue, and an
+append-only audit trail. The project detail walks the evidence chain in four steps —
+sanctioned, claimed, observed, compared — and shows the reconciliation output for
+every rule, including the ones that passed.
 
 **Contractor Portal** — claim submission against sanctioned scope. States the
 tolerance before submission. Cannot mark work complete.
