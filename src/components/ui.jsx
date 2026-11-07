@@ -96,16 +96,16 @@ export function StatusBadge({ tone = 'neutral', label, meaning, size = 'md' }) {
 /** A stat with its label above and an explanatory line below. */
 export function Metric({ label, value, detail, tone = 'neutral', emphasis = false }) {
   return (
-    <div className="bg-paper border border-hairline rounded-lg px-4 py-3.5">
+    <div className="bg-paper border border-hairline rounded-lg px-4 py-3">
       <div className="text-xs text-ink-muted">{label}</div>
       <div
-        className={`mt-1 font-semibold tabular-nums ${
-          emphasis ? 'text-3xl' : 'text-2xl'
+        className={`mt-0.5 font-semibold tabular-nums ${
+          emphasis ? 'text-2xl' : 'text-xl'
         } ${tone === 'neutral' ? 'text-ink' : TONE_TEXT[tone]}`}
       >
         {value}
       </div>
-      {detail && <div className="text-xs text-ink-muted mt-1 leading-snug">{detail}</div>}
+      {detail && <div className="text-xs text-ink-muted mt-0.5 leading-snug">{detail}</div>}
     </div>
   )
 }

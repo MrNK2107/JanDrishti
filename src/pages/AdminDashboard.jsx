@@ -411,7 +411,7 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* The answer, before any detail */}
       <div>
         <h1 className="text-2xl font-semibold text-ink">
@@ -479,7 +479,7 @@ export default function AdminDashboard() {
       </div>
 
       {view === 'overview' && (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
           <DeliveryChart
             projects={projectViews}
             selectedId={selected?.id}

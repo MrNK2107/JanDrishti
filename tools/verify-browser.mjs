@@ -59,8 +59,8 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
 
-const shot = async (name) => {
-  await page.screenshot({ path: resolve(OUT, `${name}.png`), fullPage: true })
+const shot = async (name, { full = true } = {}) => {
+  await page.screenshot({ path: resolve(OUT, `${name}.png`), fullPage: full })
 }
 
 /** Measure WCAG contrast on every rendered text node against its real backdrop. */
@@ -136,6 +136,13 @@ try {
     check(`route ${path} renders`, body.includes(expectText), `looking for "${expectText}"`)
     await shot(shotName)
   }
+
+  // Also capture the admin overview at viewport height. The full-page capture
+  // is 2000px tall and shows everything at once, which is useful for review but
+  // misleading about what a person actually sees without scrolling.
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(300)
+  await shot('admin-overview-viewport', { full: false })
 
   // === 2. Contrast on rendered pixels =======================================
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })

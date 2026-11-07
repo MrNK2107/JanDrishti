@@ -79,14 +79,14 @@ function Row({ project, selected, onSelect }) {
       aria-current={selected}
       data-chart-row={project.id}
       aria-label={`${project.name}. ${delivery.plain ?? project.plainSummary}`}
-      className={`w-full text-left rounded-lg border px-4 py-3.5 transition-colors ${
+      className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
         selected
           ? 'border-status-verified bg-paper shadow-card'
           : 'border-hairline bg-paper hover:border-border'
       }`}
     >
       <div className="flex items-baseline gap-3 flex-wrap">
-        <span className="text-base font-semibold text-ink">{project.name}</span>
+        <span className="text-sm font-semibold text-ink">{project.name}</span>
         <span className="font-mono text-xs text-ink-muted">{project.id}</span>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium">
           <span className={TONE_TEXT[tone]} aria-hidden="true">
@@ -97,8 +97,8 @@ function Row({ project, selected, onSelect }) {
       </div>
 
       {/* The chart row */}
-      <div className="mt-3">
-        <div className="relative h-6 rounded bg-sunken overflow-hidden" data-chart-track>
+      <div className="mt-2">
+        <div className="relative h-4 rounded bg-sunken overflow-hidden" data-chart-track>
           {/* Delivered — the only thing an inspector confirmed */}
           <div
             data-chart-delivered
@@ -123,7 +123,7 @@ function Row({ project, selected, onSelect }) {
         </div>
 
         {/* Scale label */}
-        <div className="flex justify-between text-2xs text-ink-muted mt-1 font-mono">
+        <div className="flex justify-between text-2xs text-ink-muted mt-0.5 font-mono">
           <span>0</span>
           <span>
             sanctioned {formatQuantity(delivery.sanctioned, unit)}
@@ -132,7 +132,7 @@ function Row({ project, selected, onSelect }) {
       </div>
 
       {/* The figures, stated rather than implied */}
-      <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs">
+      <dl className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
         <div>
           <dt className="text-ink-muted">Sanctioned</dt>
           <dd className="font-mono text-ink">{formatQuantity(delivery.sanctioned, unit)}</dd>
@@ -166,7 +166,7 @@ function Row({ project, selected, onSelect }) {
       </dl>
 
       {/* Plain language. Not decoration — this is the explanation. */}
-      <p className="mt-3 text-sm text-ink-2 leading-relaxed">
+      <p className="mt-2 text-sm text-ink-2 leading-snug">
         {project.plainSummary ?? delivery.plain}
       </p>
     </button>
@@ -208,7 +208,7 @@ export function DeliveryChart({ projects, selectedId, onSelect }) {
       </div>
 
       {/* One shared legend. Colours are never left for the reader to guess. */}
-      <div className="flex items-center gap-x-5 gap-y-2 flex-wrap text-xs text-ink-2 bg-paper border border-hairline rounded-lg px-4 py-2.5">
+      <div className="flex items-center gap-x-5 gap-y-1.5 flex-wrap text-xs text-ink-2 bg-paper border border-hairline rounded-lg px-4 py-2">
         <span className="inline-flex items-center gap-2">
           <span className="w-5 h-3 rounded-sm bg-status-verified" aria-hidden="true" />
           Delivered — confirmed by inspection
