@@ -17,15 +17,25 @@ while capturing.
 npm run dev          # http://localhost:3002
 ```
 
-Then, in the app:
+The product now opens on a **public homepage**, and the working portals sit behind
+sign-in. Set the recording up like this:
 
-1. Click **Reset demo data** in the sidebar — start from a known state.
+1. Open `http://localhost:3002` — you land on the landing page.
 2. Set the browser to **1920×1080**, full screen, and hide bookmarks.
 3. Use **Windows Game Bar** (`Win+G`), OBS, or ShareX. Record at 30 fps.
 4. Move the mouse **slowly**. Let the cursor settle before clicking.
 
-**Do not** open the demo in two tabs. State persists per tab, so a second tab
-will show different data and your recording will not match the narration.
+**Sign in before you need to.** Sign in as the Ward Officer
+(`officer@jandrishti.in` / `ward12`, or the one-click entry on the sign-in page)
+and keep that tab ready. Shot 4 cuts to the officer view, and a login form in the
+middle of that cut would interrupt the narration — so either record the sign-in as
+part of shot 3's tail, or pre-sign-in and cut.
+
+**Do not** open two tabs. Application state is held per browser, so a second tab
+shows different data and your recording will not match the narration.
+
+**To reset between takes:** sign in, then use **Reset demo** in the header. It is
+withheld from the public record page on purpose.
 
 ---
 
@@ -52,10 +62,20 @@ Total **2:23.26**. Cues are cumulative from 00:00.
 makes every infrastructure project traceable, from what was promised to what was
 actually delivered."*
 
-- Static card, no UI yet. Light canvas `#F6F8FA`, ink text `#0F172A`, the wordmark,
-  and the line *Public Works Verification & Accountability*. Match the app's light
-  theme — a dark title card cutting to a white dashboard is a jarring first second.
-- Hold still. Fade in over 0.5s, no motion otherwise.
+Two options, pick one:
+
+**Option A — static card.** Light canvas `#F6F8FA`, ink text `#0F172A`, the
+wordmark, and the line *Public Works Verification & Accountability*. Hold still,
+fade in over 0.5s.
+
+**Option B — the real homepage.** Worth considering now that the app has a landing
+page where it previously opened straight into a dashboard. Open
+`http://localhost:3002`, let the hero sit two seconds, then begin a slow scroll
+from the headline — *"Did we get what we paid for?"* — into the worked example. It
+shows the product rather than describing it, and costs nothing.
+
+Either way, match the app's light theme: a dark card cutting to a white dashboard
+is a jarring first second.
 
 ---
 
@@ -65,8 +85,8 @@ actually delivered."*
 progress reports, and inspection records... there's no systematic way to verify
 it matches what was approved and what's actually on the ground."*
 
-**Screen:** Open the **Citizen** portal and expand **T Nagar Main Road
-Resurfacing**.
+**Screen:** **Public record** — no sign-in needed. Use the `Public record` nav
+link, or go to `/record`. Expand **T Nagar Main Road Resurfacing**.
 
 - The row itself is the shot: the sentence under the project name — *"Short by
   180 m. Contractor claims 500 m but inspection found only 320 m…"* — states the
@@ -87,7 +107,9 @@ Resurfacing**.
 **Narration:** *"JanDrishti addresses this reconciliation gap... Every mismatch
 gets flagged, tracked, and resolved with full evidence."*
 
-**Screen:** **Inspector** portal → select **Saidapet Bridge Pavement Work**.
+**Screen:** Sign in as the **Field Inspector** (one-click entry on the sign-in
+page), then **Assigned inspections** → select **Saidapet Bridge Pavement Work**.
+The sign-in itself can be cut, or shown during the tail of shot 2.
 
 This is the strongest 18 seconds available, because here the system *decides*
 rather than displaying a stored verdict.
@@ -140,7 +162,8 @@ officials already know transit diagrams, so the metaphor feels immediate."*
 > will describe a diagram that is not on screen, and a judge who notices will
 > discount the whole video. Re-recording is the better trade.
 
-**Screen:** **Ward Officer** → **Ward overview** (the default view).
+**Screen:** Sign in as the **Ward Officer**, then **Ward overview** (the default
+view after sign-in).
 
 1. Open on the chart. Do not move for three seconds — let the bars read.
 2. At *"every project is a bar"*, run the cursor slowly down the three rows,
@@ -164,7 +187,7 @@ the old status-coloured lines.
 lakh rupees. The contractor reported five hundred meters complete. But the
 independent inspector observed only three hundred twenty meters..."*
 
-**Screen:** **Ward Officer** → **Ward overview** → click the **T Nagar** row.
+**Screen:** **Ward overview** → click the **T Nagar** row.
 
 This narration still fits, and every figure it names is on screen.
 
@@ -193,12 +216,12 @@ This narration still fits, and every figure it names is on screen.
 **Narration:** *"Every update retains its source, timestamp, and history...
 And citizens can view the full accountability chain."*
 
-**Screen:** **Ward Officer** → **Audit trail**, then **Citizen**.
+**Screen:** **Audit trail** in the top navigation, then the **Public record**.
 
-1. Open **Audit trail**. Scroll slowly — actor, role, timestamp, and the
+1. Go to **Audit trail** in the top navigation. Scroll slowly — actor, role, timestamp, and the
    append-only numbering are all visible. This narration is a literal description
    of this screen.
-2. At *"And citizens can view"* (~01:46), switch to the **Citizen** portal and
+2. At *"And citizens can view"* (~01:46), switch to the **Public record** and
    expand **Saidapet Bridge Pavement Work** — the one you filed in shot 3.
 3. Show its discrepancy record, including the *Decision* line.
 
@@ -253,7 +276,7 @@ in [`video/audio/durations.json`](video/audio/durations.json).
 
 ## Checklist
 
-- [ ] Reset demo data before recording (the **Reset demo** link in the header)
+- [ ] Signed in as Ward Officer, and as Field Inspector when shot 3 needs it
 - [ ] 1920×1080, 30 fps, bookmarks hidden
 - [ ] Cursor moves slowly and settles before each click
 - [ ] **Decide on segments 3 and 4 — both describe a UI that changed**
@@ -262,7 +285,7 @@ in [`video/audio/durations.json`](video/audio/durations.json).
 - [ ] All segments placed in order, none trimmed
 - [ ] Shot 3 ends on the inspector's verdict, not the form
 - [ ] Shot 5 ends on the **System comparison** step showing −36.0%
-- [ ] Shot 6 ends on the citizen decision — the strongest closing image
+- [ ] Shot 6 ends on the public decision — the strongest closing image
 - [ ] Exported as H.264, 1920×1080, 30 fps
 
 ---

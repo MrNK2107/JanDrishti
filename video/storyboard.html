@@ -152,11 +152,11 @@
         },
         {
           id: 's2_problem', file: 'audio/s2_problem.mp3', dur: 18.76,
-          title: 'The gap, in three numbers', route: 'Citizen portal',
+          title: 'The gap, in three numbers', route: 'Public record — no sign-in',
           script: 'Right now, public project information sits across work orders, progress reports, and inspection records. Citizens can’t easily compare commitments with delivery. And when a contractor reports completion, there’s no systematic way to verify it matches what was approved and what’s actually on the ground.',
           action: `
             <ol>
-              <li>Open the <strong>Citizen</strong> portal and expand <strong>T Nagar Main Road Resurfacing</strong>.</li>
+              <li>Open the <strong>Public record</strong> (no sign-in needed) and expand <strong>T Nagar Main Road Resurfacing</strong>.</li>
               <li>The sentence under the project name states the problem in words; the bar above it shows the same thing as a length. Both are the shot.</li>
               <li>At “can’t easily compare”, move the cursor slowly along the short bar, past where it stops, into the hatched outline.</li>
               <li>At “no systematic way to verify”, scroll slowly back to the summary metrics.</li>
@@ -165,11 +165,11 @@
         },
         {
           id: 's3_solution', file: 'audio/s3_solution.mp3', dur: 18.16,
-          title: 'Reconciliation, live', route: 'Inspector portal',
+          title: 'Reconciliation, live', route: 'Signed in as Inspector',
           script: 'JanDrishti addresses this reconciliation gap. The platform connects three sources of truth: the approved commitment, contractor-reported progress, and independent field observations. Every mismatch gets flagged, tracked, and resolved with full evidence.',
           action: `
             <ol>
-              <li>Open the <strong>Inspector</strong> portal and select <strong>Saidapet Bridge Pavement Work</strong>.</li>
+              <li>Sign in as the <strong>Field Inspector</strong>, then open <strong>Assigned inspections</strong> and select <strong>Saidapet Bridge Pavement Work</strong>.</li>
               <li>Point at <em>Contractor claims</em>: <strong>200 m</strong>.</li>
               <li>Type <code>90</code> into the measured field — type it, do not paste.</li>
               <li>Click <strong>Submit measurement</strong>.</li>
@@ -179,7 +179,7 @@
         },
         {
           id: 's4_dashboard', file: 'audio/s4_dashboard.mp3', dur: 18.34,
-          title: 'The delivery chart', route: 'Ward Officer → Ward overview',
+          title: 'The delivery chart', route: 'Signed in as Ward Officer',
           script: 'Here’s the admin dashboard. Projects appear as stations on a transit network diagram. Status flows as colored lines: green for verified, red for flagged discrepancies, amber for pending inspection. Municipal officials already know transit diagrams, so the metaphor feels immediate.',
           action: `
             <p style="border-left:3px solid var(--flagged);padding-left:10px;margin:0 0 10px">
@@ -199,7 +199,7 @@
         },
         {
           id: 's5_case_study', file: 'audio/s5_case_study.mp3', dur: 27.59,
-          title: 'T Nagar — 500 vs 320', route: 'Ward Officer → click the T Nagar row',
+          title: 'T Nagar — 500 vs 320', route: 'Ward overview → T Nagar row',
           script: 'Look at this road resurfacing project in T Nagar. Budget: eight lakh rupees. The contractor reported five hundred meters complete. But the independent inspector observed only three hundred twenty meters. The system flagged the quantity mismatch, created a discrepancy record, and assigned it for resolution. The project stays in disputed status until corrective work is completed and re-verified.',
           action: `
             <p>This narration still fits — every figure it names is on screen.</p>
@@ -215,23 +215,23 @@
         },
         {
           id: 's6_accountability', file: 'audio/s6_accountability.mp3', dur: 21.59,
-          title: 'Evidence chain and the public view', route: 'Audit trail → Citizen',
+          title: 'Evidence chain and the public view', route: 'Audit trail → Public record',
           script: 'Every update retains its source, timestamp, and history. Contractor submissions stay distinguishable from inspector observations. The audit trail is not optional, it’s how trust gets built. And citizens can view the full accountability chain: what was promised, what was reported, what was independently verified, and how discrepancies were resolved.',
           action: `
             <ol>
-              <li>Open <strong>Audit trail</strong>. Scroll slowly — actor, role, timestamp, append-only numbering. This narration is a literal description of the screen.</li>
-              <li>At “And citizens can view” (~01:46), switch to the <strong>Citizen</strong> portal and expand <strong>Saidapet Bridge Pavement Work</strong> — the one you filed.</li>
+              <li>Go to <strong>Audit trail</strong> in the top navigation. Scroll slowly — actor, role, timestamp, append-only numbering. This narration is a literal description of the screen.</li>
+              <li>At “And citizens can view” (~01:46), go to the <strong>Public record</strong> and expand <strong>Saidapet Bridge Pavement Work</strong> — the one you measured.</li>
               <li>Show its discrepancy record, including the <em>Decision</em> line.</li>
             </ol>`,
           aside: 'End on the citizen decision. A finding raised by an inspector, closed by an officer with a written reason, and published publicly in under two minutes — that is the whole argument.',
         },
         {
           id: 's7_mvp', file: 'audio/s7_mvp.mp3', dur: 13.79,
-          title: 'Scope', route: 'Ward Officer → Ward overview',
+          title: 'Scope', route: 'Ward overview',
           script: 'The MVP targets municipal road repair and resurfacing. Observable work sites, mappable locations, measurable quantities. It’s deliberately narrow so the workflow can be validated before expanding to other project categories.',
           action: `
             <ol>
-              <li>Back to the <strong>Ward overview</strong>. No interaction.</li>
+              <li>Back to the <strong>Ward overview</strong> (signed in as Ward Officer). No interaction.</li>
               <li>Hold on the widest view: headline, four summary metrics, chart.</li>
               <li>At “deliberately narrow”, scroll to the note at the bottom of the chart explaining what the bar does and does not claim.</li>
             </ol>`,
