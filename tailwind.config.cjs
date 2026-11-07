@@ -1,21 +1,22 @@
 /**
- * JanDrishti design tokens.
+ * JanDrishti design tokens — light theme.
  *
- * Two rules govern this palette, and they are the reason it is split the way
- * it is:
+ * Ground: white paper on a faintly cool canvas. This is a transparency record
+ * meant to be read and printed, so it follows the conventions of official
+ * documents rather than those of a dashboard: high-contrast dark text on light
+ * ground, restrained colour, and nothing that only works on a screen.
  *
- *   1. A brand color used as a FILL and the same color used as TEXT have
- *      different contrast requirements. `verified` on `midnight-900` is a text
- *      pairing; porcelain text on a `verified` fill is a fill pairing. Serving
- *      both from one hex value is what produced the original 1.75:1 defect.
+ * Three rules govern this palette:
  *
- *   2. Every pairing that carries text must clear WCAG AA — 4.5:1 for normal
- *      text, 3:1 for large text. `tools/contrast.mjs` enforces this and exits
- *      non-zero on regression. Run it after changing anything here.
+ *   1. A colour's FILL role and its TEXT role are separate tokens. Serving both
+ *      from one hex value is what produced the original 1.75:1 failure.
+ *   2. Text tokens are derived by `tools/palette-light.mjs`, which searches for
+ *      the darkest variant clearing AA on every ground actually used. Do not
+ *      hand-edit them.
+ *   3. Status is never carried by colour alone. Every status surface also has a
+ *      label and a glyph.
  *
- * The `-text` variants are the brand hues mixed 10% toward white: the minimum
- * shift that clears AA on both `midnight-900` and `midnight-800`. They were
- * derived by `tools/pick-palette.mjs`, not chosen by eye.
+ * `npm run contrast` verifies every pairing; it exits non-zero on regression.
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -24,93 +25,101 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Dark ground. Panels step lighter as they come forward.
-        midnight: {
-          950: '#07111C', // deepest — text that sits ON colored fills
-          900: '#0A1929', // app ground
-          800: '#0F1E2F', // panels
-          700: '#1A2B3D', // borders, dividers
-        },
+        // --- Grounds ---
+        canvas: '#F6F8FA', // app background
+        paper: '#FFFFFF', // cards and panels
+        sunken: '#EDF1F5', // inset areas, table stripes, chart tracks
 
-        // Foreground text on dark ground.
-        porcelain: {
-          100: '#E8EDF2', // primary text   — 15.06:1 on midnight-900
-          200: '#748A9D', // muted text     —  4.95:1 on midnight-900
-          300: '#B4C4D2', // secondary text — between the two
-        },
+        // --- Text ---
+        ink: '#0F172A', // primary           15.7:1 on paper
+        'ink-2': '#334155', // secondary          9.1:1
+        'ink-muted': '#5A6B7F', // muted / captions   4.8:1
+        'ink-subtle': '#7C8CA0', // axis + decorative only, 3.0:1 — never body copy
 
-        // Status fills. Safe for large solids and status dots.
+        // --- Lines ---
+        hairline: '#E4E9EF', // decorative separators
+        border: '#CBD5E1', // functional component borders
+
+        // --- Status: fills carry DARK text only; text tones are AA on paper ---
+        //
+        // Why dark text only: white on these fills measures 2.06:1 (pending),
+        // 3.32:1 (verified), 4.17:1 (flagged), 3.68:1 (info) — all below AA.
+        // Light text on a mid-luminance fill is the exact defect that produced
+        // the original 1.75:1 failure. `tools/solve-light.mjs` proves the point
+        // for each hue rather than assuming it.
         status: {
-          verified: '#2A9D8F',
-          flagged: '#E63946',
-          pending: '#F4A261',
+          verified: '#2A9D8F', // ink 5.37:1
+          flagged: '#E7434F', // ink 4.52:1 — lightened 5%; the brand red is 4.28:1
+          pending: '#F4A261', // ink 8.66:1
+          info: '#3B82F6', // ink 4.85:1
         },
-
-        // Status TEXT on dark ground — AA-verified variants.
         'status-text': {
-          verified: '#3FA79A', // 6.09:1 on midnight-900
-          flagged: '#E94D59', // 4.79:1 on midnight-900
-          pending: '#F5AB71', // 9.25:1 on midnight-900
+          verified: '#217A70', // 22% toward black — 4.53:1 worst case
+          flagged: '#CA323E', // 12% toward black — 4.58:1
+          pending: '#92613A', // 40% toward black — 4.63:1
+          info: '#306BCA', // 18% toward black — 4.53:1
         },
-
-        // Status TINTS for badge/pill backgrounds — dark text over these.
-        'status-tint': {
-          verified: 'rgba(42, 157, 143, 0.16)',
-          flagged: 'rgba(230, 57, 70, 0.16)',
-          pending: 'rgba(244, 162, 97, 0.16)',
+        // Soft status backgrounds for badges, rows, and callouts. Solid hex, not
+        // rgba: a translucent tint resolves to different effective colours over
+        // different grounds, which makes the contrast unmeasurable.
+        'status-soft': {
+          verified: '#E5F3F2', // 4.52:1 with status-text-verified
+          flagged: '#FDEBED', // 4.53:1
+          pending: '#FDEBDC', // 4.53:1
+          info: '#E9F1FE', // 4.53:1
         },
       },
 
-      // Legacy aliases. The dashboard referenced `bg-verified` / `text-flagged`
-      // before the palette was split. These keep those class names resolvable
-      // while the components migrate to explicit `status` / `status-text`
-      // roles. Do not add new uses.
-      backgroundColor: {
-        verified: '#2A9D8F',
-        flagged: '#E63946',
-        pending: '#F4A261',
-      },
-
-      borderWidth: {
-        3: '3px',
-      },
+      borderWidth: { 3: '3px' },
 
       fontFamily: {
-        sans: [
-          'Inter',
-          'Segoe UI',
-          'system-ui',
-          '-apple-system',
-          'sans-serif',
-        ],
+        // Inter for the interface; a serif for document headings, so the record
+        // reads like something issued rather than something computed.
+        sans: ['Inter', 'Segoe UI', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Charter', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
         mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace'],
       },
 
-      // Transit-diagram motion. Kept short: this is a government tool, not a
-      // showcase. Motion communicates state change, nothing else.
+      fontSize: {
+        // A tighter, more document-like scale than Tailwind's default display sizes.
+        '2xs': ['10px', { lineHeight: '14px' }],
+        xs: ['11px', { lineHeight: '16px' }],
+        sm: ['13px', { lineHeight: '19px' }],
+        base: ['14px', { lineHeight: '21px' }],
+        lg: ['16px', { lineHeight: '24px' }],
+        xl: ['20px', { lineHeight: '28px' }],
+        '2xl': ['26px', { lineHeight: '32px' }],
+        '3xl': ['34px', { lineHeight: '38px' }],
+        '4xl': ['44px', { lineHeight: '46px' }],
+      },
+
+      boxShadow: {
+        card: '0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06)',
+        raised: '0 2px 4px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.08)',
+      },
+
       keyframes: {
-        'flag-pulse': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.45' },
-        },
-        'draw-in': {
+        // Chart bars grow on mount so the reader's eye is drawn to magnitude.
+        'bar-grow': {
           from: { transform: 'scaleX(0)' },
           to: { transform: 'scaleX(1)' },
         },
-        'rise': {
-          from: { opacity: '0', transform: 'translateY(4px)' },
+        rise: {
+          from: { opacity: '0', transform: 'translateY(3px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
       },
       animation: {
-        'flag-pulse': 'flag-pulse 2.4s ease-in-out infinite',
-        'draw-in': 'draw-in 600ms ease-out both',
-        rise: 'rise 240ms ease-out both',
+        'bar-grow': 'bar-grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both',
+        rise: 'rise 220ms ease-out both',
+        'fade-in': 'fade-in 300ms ease-out both',
       },
 
-      transitionDuration: {
-        240: '240ms',
-      },
+      transitionDuration: { 240: '240ms' },
     },
   },
   plugins: [],

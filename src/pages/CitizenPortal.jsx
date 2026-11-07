@@ -1,15 +1,15 @@
 /**
- * Citizen Portal — the public record.
+ * Citizen Record — the public view.
  *
- * Read-only by construction: this portal dispatches no actions, so there is no
- * code path through which a member of the public can alter a record. That is
- * not a permission flag that could be misconfigured; it is the absence of the
- * capability.
+ * Read-only by construction: this page dispatches no actions and renders no
+ * form, so there is no code path through which a member of the public can alter
+ * a record. That is a structural property, not a permission flag.
  *
- * The page shows the three numbers side by side for every project, because the
- * whole argument of the product is that a citizen should be able to see the gap
- * between what was promised, what was claimed, and what was found — without
- * having to request it, and without needing to trust a summary.
+ * Written for someone with no prior knowledge of the system. Every project
+ * states, in one sentence and then in figures, what was promised, what was
+ * claimed, what was found, and what was decided. Jargon is kept to a minimum
+ * and the one term that cannot be avoided — "sanctioned" — is explained where
+ * it first appears.
  */
 
 import { useState } from 'react'
@@ -21,14 +21,51 @@ import {
   formatQuantity,
   formatRupees,
 } from '../domain/reconcile'
-import { Field, Panel, ShareBar, StatusBadge, StatusDot } from '../components/ui'
+import { StatusBadge, StatusDot, Callout, Panel } from '../components/ui'
+import { EvidenceChain } from '../components/EvidenceChain'
 
-const TONE = (status) =>
+const toneOf = (status) =>
   status === 'flagged'
     ? 'flagged'
     : status === 'verified' || status === 'resolved'
       ? 'verified'
       : 'pending'
+
+/** A compact read-only version of the delivery bar: what was paid for vs what exists. */
+function PublicBar({ delivery }) {
+  const unit = delivery.unit === 'metre' ? 'm' : delivery.unit
+  const observedPct = Math.max(0, Math.min(100, delivery.observedPercent))
+  const gapPct =
+    delivery.reportedPercent == null || delivery.observedPercent == null
+      ? 0
+      : Math.max(0, Math.min(100, delivery.reportedPercent) - observedPct)
+
+  return (
+    <div>
+      <div className="relative h-5 rounded bg-sunken overflow-hidden">
+        <div
+          className={`absolute inset-y-0 left-0 ${delivery.observed != null ? 'bg-status-verified' : 'bg-ink-subtle/40'}`}
+          style={{ width: `${delivery.observed != null ? observedPct : 0}%` }}
+        />
+        {gapPct > 0 && (
+          <div
+            className="absolute inset-y-0 border-y-2 border-r-2 border-status-flagged"
+            style={{
+              left: `${observedPct}%`,
+              width: `${gapPct}%`,
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(202,50,62,0.20) 0 3px, transparent 3px 7px)',
+            }}
+          />
+        )}
+      </div>
+      <div className="flex justify-between text-2xs text-ink-muted mt-1 font-mono">
+        <span>nothing delivered</span>
+        <span>all {formatQuantity(delivery.sanctioned, unit)} sanctioned</span>
+      </div>
+    </div>
+  )
+}
 
 export default function CitizenPortal() {
   const { state, projectViews } = useStore()
@@ -36,67 +73,66 @@ export default function CitizenPortal() {
   const audit = selectAuditLog(state)
 
   const [filter, setFilter] = useState('all')
-  const [openId, setOpenId] = useState(() => projectViews[0]?.id)
+  const [openId, setOpenId] = useState(null)
 
-  const shown = projectViews.filter((p) => {
-    if (filter === 'all') return true
-    if (filter === 'flagged') return p.status === 'flagged'
-    if (filter === 'clean') return p.status === 'verified' || p.status === 'resolved'
-    return true
-  })
+  const shown = projectViews.filter((p) =>
+    filter === 'flagged'
+      ? p.status === 'flagged'
+      : filter === 'clean'
+        ? p.status === 'verified' || p.status === 'resolved'
+        : true
+  )
 
   return (
-    <div className="space-y-5 max-w-5xl">
-      {/* Plain-language summary */}
-      <Panel
-        title="What this page shows"
-        subtitle="Ward 12, Greater Chennai · every sanctioned public works project"
-      >
-        <p className="text-sm leading-relaxed text-porcelain-100">
-          For each project, three independent numbers are published:{' '}
-          <span className="text-porcelain-100 font-medium">what was sanctioned</span>,{' '}
-          <span className="text-porcelain-100 font-medium">what the contractor reported</span>,
-          and{' '}
-          <span className="text-porcelain-100 font-medium">
-            what an independent inspector found on site
-          </span>
-          . Where the reported figure and the observed figure disagree beyond a published
-          tolerance, a discrepancy is opened and its resolution is recorded here.
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h1 className="text-2xl font-semibold text-ink">What your ward paid for</h1>
+        <p className="text-sm text-ink-2 mt-2 leading-relaxed">
+          For every public works project in Ward 12, this page publishes three figures:{' '}
+          <strong className="font-semibold">what was sanctioned</strong> (approved and
+          budgeted), <strong className="font-semibold">what the contractor reported</strong>, and{' '}
+          <strong className="font-semibold">what an independent inspector actually found on
+          site</strong>. Where the claim and the finding disagree, the discrepancy and its
+          resolution are published too.
         </p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
-          <Field label="Projects published" mono>
-            {summary.projects}
-          </Field>
-          <Field label="Total sanctioned" mono>
-            {formatRupees(summary.totalBudget)}
-          </Field>
-          <Field label="Open discrepancies" mono>
-            <span className={summary.openDiscrepancies > 0 ? 'text-status-text-flagged' : ''}>
-              {summary.openDiscrepancies}
-            </span>
-          </Field>
-          <Field label="Resolved to date" mono>
-            <span className="text-status-text-verified">{summary.resolvedDiscrepancies}</span>
-          </Field>
-        </div>
-      </Panel>
+      </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          ['Projects published', summary.projects, 'text-ink'],
+          ['Total sanctioned', formatRupees(summary.totalBudget), 'text-ink'],
+          [
+            'Open discrepancies',
+            summary.openDiscrepancies,
+            summary.openDiscrepancies > 0 ? 'text-status-text-flagged' : 'text-ink',
+          ],
+          ['Discrepancies resolved', summary.resolvedDiscrepancies, 'text-status-text-verified'],
+        ].map(([label, value, cls]) => (
+          <div key={label} className="bg-paper border border-hairline rounded-lg px-4 py-3.5">
+            <div className="text-xs text-ink-muted">{label}</div>
+            <div className={`text-2xl font-semibold mt-1 tabular-nums ${cls}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
         {[
           ['all', `All projects (${projectViews.length})`],
-          ['flagged', `Open discrepancies (${projectViews.filter((p) => p.status === 'flagged').length})`],
-          ['clean', `Corroborated (${projectViews.filter((p) => p.status === 'verified' || p.status === 'resolved').length})`],
+          ['flagged', `With open discrepancies (${projectViews.filter((p) => p.status === 'flagged').length})`],
+          [
+            'clean',
+            `Fully delivered (${projectViews.filter((p) => p.status === 'verified' || p.status === 'resolved').length})`,
+          ],
         ].map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setFilter(id)}
             aria-current={filter === id}
-            className={`px-3.5 py-2 rounded border text-xs transition-colors ${
+            className={`px-3.5 py-2 rounded border text-sm transition-colors ${
               filter === id
-                ? 'border-status-verified bg-midnight-800 text-porcelain-100'
-                : 'border-midnight-700 text-porcelain-200 hover:text-porcelain-100'
+                ? 'border-ink bg-paper text-ink font-medium'
+                : 'border-hairline bg-paper text-ink-muted hover:text-ink'
             }`}
           >
             {label}
@@ -104,156 +140,115 @@ export default function CitizenPortal() {
         ))}
       </div>
 
-      {/* Public register */}
       <div className="space-y-3">
         {shown.map((p) => {
-          const milestone = p.milestones[0]
           const expanded = openId === p.id
-          const tone = TONE(p.status)
+          const tone = toneOf(p.status)
+          const unit = p.delivery.unit === 'metre' ? 'm' : p.delivery.unit
 
           return (
-            <div
-              key={p.id}
-              className="bg-midnight-800 border border-midnight-700 rounded-lg overflow-hidden"
-            >
+            <section key={p.id} className="bg-paper border border-hairline rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setOpenId(expanded ? null : p.id)}
                 aria-expanded={expanded}
-                className="w-full text-left px-5 py-4 hover:bg-midnight-950/50 transition-colors"
+                className="w-full text-left px-5 py-4 hover:bg-canvas/60 transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <StatusDot tone={tone} pulse={p.status === 'flagged'} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold">{p.name}</div>
-                    <div className="text-[11px] text-porcelain-200 mt-0.5 font-mono">
+                    <h2 className="text-base font-semibold text-ink">{p.name}</h2>
+                    <p className="font-mono text-xs text-ink-muted mt-0.5">
                       {p.id} · {p.location}
-                    </div>
+                    </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <StatusBadge
                       tone={tone}
                       label={PROJECT_STATUS_META[p.status]?.label ?? p.status}
+                      meaning={p.plainSummary}
                       size="sm"
                     />
-                    <div className="text-[11px] text-porcelain-200 mt-1.5 font-mono">
+                    <div className="font-mono text-xs text-ink-muted mt-1.5">
                       {formatRupees(p.budget)}
                     </div>
                   </div>
                 </div>
-              </button>
 
-              {expanded && milestone && (
-                <div className="px-5 pb-5 pt-1 border-t border-midnight-700 animate-rise">
-                  {/* The three numbers, published side by side */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4">
-                    <div className="rounded border border-midnight-700 bg-midnight-950 px-4 py-3">
-                      <div className="text-[10px] uppercase tracking-wider text-porcelain-200">
-                        1 · Sanctioned
-                      </div>
-                      <div className="text-lg font-mono mt-1">
-                        {formatQuantity(milestone.commitment.quantity, milestone.commitment.unit)}
-                      </div>
-                      <div className="text-[10px] text-porcelain-200 mt-1">
-                        Approved {p.sanctionedOn}
-                      </div>
-                    </div>
-                    <div className="rounded border border-midnight-700 bg-midnight-950 px-4 py-3">
-                      <div className="text-[10px] uppercase tracking-wider text-porcelain-200">
-                        2 · Contractor reported
-                      </div>
-                      <div className="text-lg font-mono mt-1">
-                        {milestone.report
-                          ? formatQuantity(
-                              milestone.report.claimedQuantity,
-                              milestone.commitment.unit
-                            )
-                          : '—'}
-                      </div>
-                      <div className="text-[10px] text-porcelain-200 mt-1">
-                        {milestone.report ? milestone.report.reportedBy : 'No claim filed'}
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded border px-4 py-3 ${
-                        milestone.deviations.length > 0
-                          ? 'border-status-flagged/40 bg-status-tint-flagged'
-                          : 'border-midnight-700 bg-midnight-950'
-                      }`}
-                    >
-                      <div className="text-[10px] uppercase tracking-wider text-porcelain-200">
-                        3 · Independently observed
-                      </div>
-                      <div className="text-lg font-mono mt-1">
-                        {milestone.inspection
-                          ? formatQuantity(
-                              milestone.inspection.observedQuantity,
-                              milestone.commitment.unit
-                            )
-                          : '—'}
-                      </div>
-                      <div className="text-[10px] text-porcelain-200 mt-1">
-                        {milestone.inspection
-                          ? milestone.inspection.inspectedBy
-                          : 'Not yet inspected'}
-                      </div>
+                {/* The one-sentence answer */}
+                <p className="text-sm text-ink-2 mt-3 leading-relaxed">{p.plainSummary}</p>
+
+                <div className="mt-3">
+                  <PublicBar delivery={p.delivery} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mt-3 text-xs">
+                  <div>
+                    <div className="text-ink-muted">Sanctioned</div>
+                    <div className="font-mono text-ink">
+                      {formatQuantity(p.delivery.sanctioned, unit)}
                     </div>
                   </div>
+                  <div>
+                    <div className="text-ink-muted">Contractor reported</div>
+                    <div className="font-mono text-ink">
+                      {p.delivery.reported == null
+                        ? '—'
+                        : formatQuantity(p.delivery.reported, unit)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-ink-muted">Inspector found</div>
+                    <div className="font-mono text-ink">
+                      {p.delivery.observed == null
+                        ? 'not yet inspected'
+                        : formatQuantity(p.delivery.observed, unit)}
+                    </div>
+                  </div>
+                </div>
 
-                  <ShareBar
-                    label={`Delivered against sanction (per ${milestone.completion.basis === 'observed' ? 'independent observation' : milestone.completion.basis === 'reported' ? 'contractor claim only' : 'no evidence'})`}
-                    percent={milestone.completion.percent}
-                    tone={milestone.completion.percent >= 99 ? 'verified' : 'flagged'}
-                  />
+                <div className="text-xs text-ink-muted mt-3">
+                  {expanded ? '▲ Hide the full record' : '▼ Show the full record'}
+                </div>
+              </button>
 
-                  {milestone.inspection?.note && (
-                    <p className="text-xs text-porcelain-200 mt-4 leading-relaxed">
-                      <span className="uppercase tracking-wider text-[10px]">
-                        Inspector&rsquo;s note ·{' '}
-                      </span>
-                      {milestone.inspection.note}
-                    </p>
+              {expanded && (
+                <div className="px-5 pb-5 pt-1 border-t border-hairline animate-fade-in">
+                  {p.milestones[0] && (
+                    <EvidenceChain milestone={p.milestones[0]} project={p} />
                   )}
 
-                  {/* Findings and their disposition, in public */}
                   {p.discrepancies.length > 0 && (
-                    <div className="mt-5 pt-4 border-t border-midnight-700">
-                      <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-3">
+                    <div className="mt-5">
+                      <h3 className="text-2xs uppercase tracking-wide text-ink-muted mb-2">
                         Discrepancy record
                       </h3>
                       <ul className="space-y-2">
                         {p.discrepancies.map((d) => (
-                          <li
-                            key={d.id}
-                            className="bg-midnight-950 border border-midnight-700 rounded px-4 py-3"
-                          >
+                          <li key={d.id} className="border border-hairline rounded-lg px-4 py-3">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <StatusDot
-                                tone={d.status === 'resolved' ? 'verified' : d.status === 'dismissed' ? 'neutral' : 'flagged'}
-                                size="sm"
-                              />
-                              <span className="text-xs font-medium">
+                              <span className="font-mono text-xs text-ink-muted">{d.id}</span>
+                              <span className="text-sm font-medium text-ink">
                                 {DISCREPANCY_KIND_META[d.kind]?.label ?? d.kind}
-                              </span>
-                              <span className="text-[10px] font-mono text-porcelain-200">
-                                {d.id}
                               </span>
                               <span className="ml-auto">
                                 <StatusBadge
-                                  tone={d.status === 'resolved' ? 'verified' : d.status === 'dismissed' ? 'neutral' : 'flagged'}
+                                  tone={d.status === 'resolved' ? 'verified' : 'flagged'}
                                   label={d.status}
                                   size="sm"
                                 />
                               </span>
                             </div>
-                            <p className="text-xs text-porcelain-200 mt-2 leading-relaxed">
-                              {d.detail}
-                            </p>
-                            {d.resolution && (
-                              <p className="text-xs mt-2 pt-2 border-t border-midnight-700 leading-relaxed">
-                                <span className="text-porcelain-200">Disposition: </span>
+                            <p className="text-sm text-ink-2 mt-1.5 leading-relaxed">{d.detail}</p>
+                            {d.resolution ? (
+                              <p className="text-sm text-ink-2 mt-2 pt-2 border-t border-hairline leading-relaxed">
+                                <span className="text-ink-muted">Decision: </span>
                                 {d.resolution}
-                                <span className="text-porcelain-200"> — {d.resolvedBy}</span>
+                                <span className="text-ink-muted"> — {d.resolvedBy}</span>
+                              </p>
+                            ) : (
+                              <p className="text-sm text-status-text-flagged mt-2">
+                                No decision recorded yet.
                               </p>
                             )}
                           </li>
@@ -262,40 +257,42 @@ export default function CitizenPortal() {
                     </div>
                   )}
 
-                  {/* Every action on this project, in order */}
-                  <div className="mt-5 pt-4 border-t border-midnight-700">
-                    <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-3">
-                      Recorded actions
+                  <div className="mt-5">
+                    <h3 className="text-2xs uppercase tracking-wide text-ink-muted mb-2">
+                      Everything recorded, in order
                     </h3>
-                    <ol className="space-y-2">
+                    <ol className="space-y-1.5">
                       {audit
-                        .filter((e) => e.subject.includes(p.id) || p.discrepancies.some((d) => e.subject === d.id))
+                        .filter(
+                          (e) =>
+                            e.subject.includes(p.id) ||
+                            p.discrepancies.some((d) => e.subject === d.id)
+                        )
                         .map((e) => (
-                          <li key={e.id} className="flex gap-3 text-xs">
-                            <span className="font-mono text-porcelain-200 shrink-0 w-24">
+                          <li key={e.id} className="flex gap-3 text-sm">
+                            <span className="font-mono text-xs text-ink-muted w-20 shrink-0">
                               {new Date(e.at).toLocaleDateString('en-IN', {
                                 day: '2-digit',
                                 month: 'short',
                               })}
                             </span>
-                            <span className="text-porcelain-100">{e.note}</span>
+                            <span className="text-ink-2">{e.note}</span>
                           </li>
                         ))}
                     </ol>
                   </div>
                 </div>
               )}
-            </div>
+            </section>
           )
         })}
       </div>
 
-      <p className="text-xs text-porcelain-200 leading-relaxed max-w-3xl">
-        This portal is read-only. No record on this page can be created, edited, or removed
-        from here — the citizen view has no capability to dispatch a change. Corrections are
-        made by the responsible officer in the Ward Admin portal and appear in the audit trail
-        above.
-      </p>
+      <Callout tone="info" title="This page cannot change anything">
+        It has no buttons that create, edit, or remove a record — no such capability exists on
+        this page. Corrections are made by the responsible officer in the Ward Officer portal and
+        appear above automatically.
+      </Callout>
     </div>
   )
 }

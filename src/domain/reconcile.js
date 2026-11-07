@@ -277,3 +277,132 @@ export function formatQuantity(value, unit) {
 export function formatRupees(amount) {
   return `₹${Number(amount).toLocaleString('en-IN')}`
 }
+
+/**
+ * A compact lakh/crore rendering for chart axes and tight labels.
+ * ₹8,00,000 is hard to scan at a glance; ₹8.0L is not.
+ */
+export function formatRupeesShort(amount) {
+  const n = Number(amount)
+  if (n >= 1e7) return `₹${round3(n / 1e7)}Cr`
+  if (n >= 1e5) return `₹${round3(n / 1e5)}L`
+  if (n >= 1e3) return `₹${round3(n / 1e3)}K`
+  return `₹${n}`
+}
+
+/**
+ * How far through delivery this milestone actually is, expressed as a
+ * percentage of the sanctioned quantity, with the basis named.
+ *
+ * This exists to make one question answerable without arithmetic: *did we get
+ * what we paid for?* Three figures are involved — sanctioned, reported,
+ * observed — and the difference between the last two is the entire product.
+ *
+ * `observedPercent` is the honest number. `reportedPercent` is what the
+ * contractor asserts. `gapPercent` is the difference, and it is positive when
+ * the claim exceeds reality. Percentages are clamped at 0 for display but the
+ * gap is computed from raw values, so an overrun reads as a negative gap.
+ *
+ * @returns {{
+ *   sanctioned: number, reported: number|null, observed: number|null,
+ *   reportedPercent: number|null, observedPercent: number|null,
+ *   gapPercent: number|null,
+ *   basis: 'observed'|'reported'|'none',
+ *   shortfallUnits: number|null,
+ *   plain: string
+ * }}
+ */
+export function deliveryProgress(commitment, report, inspection) {
+  const sanctioned = commitment.quantity
+  const unit = UNIT_LABELS[commitment.unit] ?? ''
+
+  const pctOf = (v) => (sanctioned === 0 ? 0 : round3((v / sanctioned) * 100))
+
+  const reported = report ? report.claimedQuantity : null
+  const observed = inspection ? inspection.observedQuantity : null
+
+  const reportedPercent = reported == null ? null : pctOf(reported)
+  const observedPercent = observed == null ? null : pctOf(observed)
+
+  // The gap is only meaningful once both figures exist.
+  const gapPercent =
+    reported != null && observed != null ? round3(pctOf(reported) - pctOf(observed)) : null
+
+  const shortfallUnits = reported != null && observed != null ? round3(reported - observed) : null
+
+  const basis = observed != null ? 'observed' : reported != null ? 'reported' : 'none'
+
+  // One sentence a non-expert can read. Deliberately written in plain language
+  // and avoided wherever a shorter label will do.
+  let plain
+  if (basis === 'none') {
+    plain = `Nothing reported yet against ${sanctioned}${unit ? ' ' + unit : ''} sanctioned.`
+  } else if (basis === 'reported') {
+    plain =
+      `Contractor reports ${reported}${unit ? ' ' + unit : ''} of ` +
+      `${sanctioned}${unit ? ' ' + unit : ''} sanctioned. Not yet independently inspected, ` +
+      `so this figure is a claim, not a verified result.`
+  } else if (shortfallUnits === 0) {
+    plain =
+      `Fully delivered. Independent inspection confirms all ` +
+      `${sanctioned}${unit ? ' ' + unit : ''} sanctioned.`
+  } else if (shortfallUnits > 0) {
+    plain =
+      `Short by ${shortfallUnits}${unit ? ' ' + unit : ''}. Contractor claims ` +
+      `${reported}${unit ? ' ' + unit : ''} but inspection found only ` +
+      `${observed}${unit ? ' ' + unit : ''} — ${observedPercent}% of the sanctioned ` +
+      `${sanctioned}${unit ? ' ' + unit : ''}.`
+  } else {
+    plain =
+      `Delivered ${observed}${unit ? ' ' + unit : ''} against ` +
+      `${sanctioned}${unit ? ' ' + unit : ''} sanctioned — more than sanctioned.`
+  }
+
+  return {
+    sanctioned,
+    reported,
+    observed,
+    reportedPercent,
+    observedPercent,
+    gapPercent,
+    basis,
+    shortfallUnits,
+    plain,
+  }
+}
+
+/**
+ * A single plain-language sentence describing a project's overall standing,
+ * for the top of a detail panel. Written for someone who has never seen the
+ * system before.
+ */
+export function projectSummary({ name, status, milestones = [], discrepancies = [] }) {
+  const live = discrepancies.filter((d) => d.status === 'open' || d.status === 'under_review')
+  const first = milestones[0]
+
+  if (status === 'flagged') {
+    const high = live.filter((d) => d.severity === 'high').length
+    const what = high > 0 ? 'a significant discrepancy' : 'a discrepancy'
+    const progress = first
+      ? deliveryProgress(first.commitment, first.report, first.inspection)
+      : null
+    return progress && progress.shortfallUnits > 0
+      ? `${name} has ${what} open. ${progress.plain}`
+      : `${name} has ${what} open and awaiting an officer's decision.`
+  }
+
+  if (status === 'pending_inspection') {
+    return `${name} has been reported complete by the contractor but not yet independently inspected. The claim is unverified until an inspector measures the site.`
+  }
+
+  if (status === 'resolved') {
+    return `${name} had a discrepancy that has since been resolved. The finding and its resolution are recorded below.`
+  }
+
+  if (status === 'verified') {
+    return `${name} is verified. Independent inspection confirms the work matches what was sanctioned.`
+  }
+
+  return `${name} is registered with no progress reported yet.`
+}
+

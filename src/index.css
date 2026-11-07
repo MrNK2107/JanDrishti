@@ -3,7 +3,38 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    @apply bg-midnight-900 text-porcelain-100 font-sans;
+    @apply bg-canvas text-ink font-sans;
+  }
+
+  /* Numbers in tables, figures, and charts must align on the decimal. */
+  .tabular-nums,
+  table,
+  dl {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A visible, consistent focus ring. The previous theme relied on a ring that
+     disappeared against some surfaces; on light ground it must be unmistakable. */
+  :focus-visible {
+    outline: 2px solid #217a70;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Print matters for a public record: an officer may hand this to someone. */
+  @media print {
+    body {
+      background: #fff;
+    }
+    nav,
+    footer {
+      display: none;
+    }
   }
 }

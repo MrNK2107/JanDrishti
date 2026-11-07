@@ -179,17 +179,22 @@ and no form element.
 
 ---
 
-## D12 — Streamlit neither, and no map library
+## D12 — No mapping or charting library
 
-**Decided.** The transit diagram and cadastral grid are hand-built with
-absolutely-positioned elements and one inline SVG pattern.
+**Decided.** The delivery chart is hand-built with absolutely-positioned
+elements. No mapping library, no charting library, no new runtime dependency.
 
-**Alternative.** A mapping library (Leaflet, MapLibre) or a charting library.
+**Alternative.** Leaflet or MapLibre for geography; a charting library for bars.
 
-**Why.** The diagram plots ~6 stations on a stylised schematic. A projection
-library would add hundreds of kilobytes and a tile dependency, for a visual that
-is deliberately *not* geographic — it is a transit diagram with survey-map
-styling, which is the point. Zero new runtime dependencies were added.
+**Why.** The earlier transit diagram plotted six stations on a stylised
+schematic that was deliberately *not* geographic, so a projection library would
+have added hundreds of kilobytes and a tile dependency for a picture that was
+not a map. The current chart is a bullet chart: a bar, a track, and one outlined
+span. A charting library would be more code than the chart. Zero runtime
+dependencies were added.
+
+**Superseded in part.** The transit diagram this decision originally described
+has been deleted — see D14.
 
 ---
 
@@ -222,3 +227,75 @@ quietly:
 The old `DELIVERY.md` is superseded by this file and by `STATUS.md`. Its
 "95% complete" headline counted the app, tests, and documentation as done while
 excluding the entire backend from the denominator.
+
+---
+
+## D14 — The transit diagram was deleted, and light replaced dark
+
+**Decided.** The ward map — a transit network over a cadastral survey grid — was
+removed entirely and replaced by a bullet-style delivery chart. The dark theme
+was replaced by a light one.
+
+**What was wrong with the diagram.** It was built because the inherited design
+documents called for one, and that was the error: I implemented the brief instead
+of asking what a reader needs to see.
+
+A transit diagram encodes **sequence and connection**. This data has neither. The
+projects were not stops on a line. The connecting line between them represented
+nothing. The stations happened to sit in a horizontal row because that was the
+only way to arrange them, and their vertical positions were arbitrary. A coloured
+line implied a category boundary that did not exist. The visual asserted
+structure that was not in the data — which is exactly why a reviewer said it
+"does not explain anything". Decoration in the costume of a chart is worse than
+no chart, because it invites conclusions the data cannot support.
+
+The replacement encodes the one thing that matters: **a bar whose length is
+delivered quantity against sanctioned quantity.** Length carries magnitude;
+colour carries only reconciliation state, so the chart still works in greyscale.
+The claimed-but-not-delivered span is drawn as a hatched outline rather than a
+solid fill, because an assertion should not look as solid as a verified fact.
+
+**Why light replaced dark.** Chosen on measurement, not taste. The status red
+that failed AA as text on the dark ground (4.26:1) reaches **4.58:1** on white,
+and green needs far less correction. A transparency record is also the kind of
+document people print and hand to one another.
+
+**The mistake inside the fix, recorded.** The first light palette used rgba tints
+for "soft" status backgrounds. A translucent tint resolves to a different
+effective colour depending on what sits behind it, which makes its contrast
+unmeasurable and therefore unverifiable. Replaced with solid hex values solved by
+`tools/solve-light.mjs` — the same shape of error as the original 1.75:1 defect,
+and caught by the same kind of check.
+
+**Also fixed while measuring.** A second attempt at `ink-subtle` (3.43:1 on
+white) was being used for 11px labels. The token had been approved by policy for
+chart axes only, but nothing enforced that. It is now used for fills and nothing
+else, with the distinction recorded in `tools/contrast.mjs`.
+
+---
+
+## D15 — Explainability is computed copy, not decorative panels
+
+**Decided.** The sentences that explain a shortfall come from pure functions in
+`src/domain/reconcile.js` — `deliveryProgress()` and `projectSummary()` — and are
+unit-tested for wording.
+
+**Why.** The previous interface showed a table of three numbers and expected the
+reader to infer the relationship. A field reading "Inspector Observed: 320m" next
+to "Contractor Reported: 500m" explains nothing unless you already know what the
+system does with them.
+
+Three changes address that:
+
+1. **Every project states its consequence in one sentence**, generated from the
+   same function everywhere, so no two screens can describe the same facts
+   differently.
+2. **The detail view walks the chain in order** — sanctioned, claimed, observed,
+   compared — with each step attributed to a party and dated, and the applicable
+   rule and tolerance shown as working.
+3. **The conclusion is a sentence, not a status code.** "Flagged" tells you
+   nothing; "the claimed work is not on the ground" does.
+
+Putting the wording in the domain layer means it is covered by tests and cannot
+drift from the figures it describes — which is precisely how the earlier
+documentation drifted from the code.

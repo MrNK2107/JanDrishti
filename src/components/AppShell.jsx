@@ -1,8 +1,11 @@
 /**
- * App shell — identity, role navigation, and the persistent audit affordance.
+ * App shell — identity, role navigation, and the state of the ward.
  *
- * The four portals are one product, so they share a chrome and are one click
- * apart. A judge should never have to guess that the contractor view exists.
+ * The four portals form one cycle, so they are presented in the order the work
+ * actually moves: a contractor claims, an inspector verifies, an officer
+ * decides, the public sees the outcome. Numbering them makes the loop legible
+ * without a diagram, which is what the old transit map was unsuccessfully
+ * trying to do.
  */
 
 import { NavLink, useLocation } from 'react-router-dom'
@@ -10,11 +13,12 @@ import { useStore } from '../store/StoreProvider'
 import { selectSummary } from '../domain/selectors'
 import { StatusDot } from './ui'
 
+/** Ordered as the accountability cycle runs, not alphabetically. */
 const ROLES = [
-  { to: '/', label: 'Ward Admin', glyph: '▦', end: true },
-  { to: '/contractor', label: 'Contractor', glyph: '▤' },
-  { to: '/inspector', label: 'Inspector', glyph: '◎' },
-  { to: '/citizen', label: 'Citizen', glyph: '◍' },
+  { to: '/contractor', step: '1', label: 'Contractor', note: 'Report work done' },
+  { to: '/inspector', step: '2', label: 'Inspector', note: 'Verify on site' },
+  { to: '/', step: '3', label: 'Ward Officer', note: 'Review discrepancies', end: true },
+  { to: '/citizen', step: '4', label: 'Citizen', note: 'See the record' },
 ]
 
 export function AppShell({ children, code }) {
@@ -23,104 +27,121 @@ export function AppShell({ children, code }) {
   const location = useLocation()
 
   return (
-    <div className="min-h-screen bg-midnight-900 text-porcelain-100 flex">
-      {/* Left rail */}
-      <aside className="w-[248px] shrink-0 bg-midnight-950 border-r border-midnight-700 flex flex-col">
-        <div className="px-5 py-5 border-b border-midnight-700">
-          <div className="flex items-center gap-2.5">
+    <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      {/* Masthead */}
+      <header className="bg-paper border-b border-border">
+        <div className="max-w-[1180px] mx-auto px-5 h-14 flex items-center gap-5">
+          <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
             <span
               aria-hidden="true"
-              className="w-7 h-7 rounded bg-status-verified text-midnight-950 grid place-items-center font-bold text-sm"
+              className="w-7 h-7 rounded bg-ink text-paper grid place-items-center font-bold text-sm"
             >
               ज
             </span>
-            <div>
-              <div className="text-sm font-semibold leading-tight">JanDrishti</div>
-              <div className="text-[10px] text-porcelain-200 leading-tight">
+            <span>
+              <span className="block text-sm font-bold leading-tight text-ink">JanDrishti</span>
+              <span className="block text-2xs text-ink-muted leading-tight">
                 Public Works Accountability
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <nav className="py-3" aria-label="Portal">
-          {ROLES.map((role) => (
-            <NavLink
-              key={role.to}
-              to={role.to}
-              end={role.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-5 py-2.5 text-sm border-l-3 ${
-                  isActive
-                    ? 'bg-midnight-800 border-l-status-flagged text-porcelain-100 font-medium'
-                    : 'border-l-transparent text-porcelain-200 hover:text-porcelain-100 hover:bg-midnight-800/60'
-                }`
-              }
-            >
-              <span aria-hidden="true" className="text-base">
-                {role.glyph}
               </span>
-              {role.label}
-            </NavLink>
-          ))}
-        </nav>
+            </span>
+          </NavLink>
 
-        <div className="mt-auto p-5 border-t border-midnight-700 space-y-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-2">
-              Ward 12 Status
-            </div>
-            <dl className="space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <dt className="text-porcelain-200">Projects</dt>
-                <dd className="font-mono">{summary.projects}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="flex items-center gap-1.5 text-porcelain-200">
-                  <StatusDot tone={summary.openDiscrepancies > 0 ? 'flagged' : 'verified'} size="sm" />
-                  Open findings
-                </dt>
-                <dd className="font-mono">{summary.openDiscrepancies}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-porcelain-200">Awaiting inspection</dt>
-                <dd className="font-mono">{summary.awaitingInspection}</dd>
-              </div>
-            </dl>
-          </div>
+          <span className="hidden md:block text-xs text-ink-muted border-l border-hairline pl-5">
+            {code?.title}
+          </span>
 
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'RESET_DEMO' })}
-            className="w-full text-left text-[11px] text-porcelain-200 hover:text-porcelain-100 underline decoration-dotted underline-offset-2"
-          >
-            Reset demo data
-          </button>
-        </div>
-      </aside>
-
-      {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-14 shrink-0 bg-midnight-950 border-b border-midnight-700 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <h1 className="text-sm font-semibold truncate">{code?.title}</h1>
-            {code?.subtitle && (
-              <span className="text-xs text-porcelain-200 truncate hidden md:inline">
-                {code.subtitle}
+          <div className="ml-auto flex items-center gap-4">
+            {summary.openDiscrepancies > 0 ? (
+              <span className="inline-flex items-center gap-2 text-xs font-medium text-status-text-flagged">
+                <StatusDot tone="flagged" pulse />
+                {summary.openDiscrepancies === 1
+                  ? '1 open discrepancy'
+                  : `${summary.openDiscrepancies} open discrepancies`}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-xs font-medium text-status-text-verified">
+                <StatusDot tone="verified" />
+                No open discrepancies
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-3 text-[11px] text-porcelain-200">
-            <span className="hidden lg:inline font-mono">
-              {location.pathname === '/citizen'
-                ? 'PUBLIC RECORD — READ ONLY'
-                : 'DEMONSTRATION DATA'}
+            <span className="hidden lg:inline text-2xs text-ink-muted border-l border-hairline pl-4 py-1">
+              {location.pathname === '/citizen' ? 'PUBLIC RECORD' : 'DEMONSTRATION DATA'}
             </span>
+            {/*
+              Reset lives here, not in the footer, and is withheld from the citizen
+              view entirely. The public record should contain no control that
+              changes a record — including a demo affordance, because a reader
+              cannot be expected to know the difference.
+            */}
+            {location.pathname !== '/citizen' && (
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'RESET_DEMO' })}
+                title="Restore the seeded demonstration data"
+                className="text-2xs text-ink-muted hover:text-ink underline decoration-dotted underline-offset-2 whitespace-nowrap"
+              >
+                Reset demo
+              </button>
+            )}
           </div>
-        </header>
+        </div>
 
-        <main className="flex-1 min-w-0 p-6 overflow-x-hidden">{children}</main>
-      </div>
+        {/* The cycle, as four labelled steps */}
+        <nav className="border-t border-hairline bg-canvas" aria-label="Accountability cycle">
+          <ol className="max-w-[1180px] mx-auto px-5 flex items-stretch overflow-x-auto">
+            {ROLES.map((role) => (
+              <li key={role.to} className="flex-1 min-w-[168px]">
+                <NavLink
+                  to={role.to}
+                  end={role.end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 h-14 px-3 border-b-2 transition-colors ${
+                      isActive
+                        ? 'border-b-ink bg-paper'
+                        : 'border-b-transparent hover:bg-paper/60'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className={`w-6 h-6 rounded-full grid place-items-center text-2xs font-bold shrink-0 ${
+                          isActive ? 'bg-ink text-paper' : 'bg-paper text-ink-muted border border-border'
+                        }`}
+                      >
+                        {role.step}
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className={`block text-sm leading-tight truncate ${
+                            isActive ? 'font-semibold text-ink' : 'text-ink-2'
+                          }`}
+                        >
+                          {role.label}
+                        </span>
+                        <span className="block text-2xs text-ink-muted leading-tight truncate">
+                          {role.note}
+                        </span>
+                      </span>
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </header>
+
+      <main className="flex-1 w-full max-w-[1180px] mx-auto px-5 py-6">{children}</main>
+
+      <footer className="border-t border-hairline bg-paper">
+        <div className="max-w-[1180px] mx-auto px-5 py-4">
+          <p className="text-xs text-ink-muted">
+            Demonstration data. Figures are seeded, not live municipal records.
+          </p>
+        </div>
+      </footer>
     </div>
   )
 }

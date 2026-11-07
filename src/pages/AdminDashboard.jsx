@@ -1,15 +1,14 @@
 /**
- * Ward Admin — the reconciliation review surface.
+ * Ward Officer — the reconciliation review surface.
  *
- * Three views over one dataset: the ward map, the discrepancy queue, and the
- * audit trail. The map is the default because the transit metaphor is the
- * product's argument: a reviewer should be able to see the state of the ward
- * before reading a single number.
+ * Structure follows the question a reader arrives with:
  *
- * The project detail panel shows the three sources of truth side by side and
- * the reconciliation output for *every* rule — including rules that passed.
- * Showing only failures would make the system look like an accusation engine;
- * showing the working makes it auditable.
+ *   1. "Is anything wrong?"        → the one-line status and the metric row
+ *   2. "Which projects, and how?"  → the delivery chart, worst-first
+ *   3. "Why? Show me the working." → the evidence chain for one project
+ *   4. "What do I do about it?"    → the finding and its disposition
+ *
+ * The previous version led with a stylised map that answered none of these.
  */
 
 import { useState } from 'react'
@@ -18,287 +17,207 @@ import { selectProjectViews, selectSummary, selectAuditLog } from '../domain/sel
 import {
   PROJECT_STATUS_META,
   DISCREPANCY_KIND_META,
+  DISCREPANCY_STATUS_META,
   formatQuantity,
   formatRupees,
-  TOLERANCE,
+  formatRupeesShort,
 } from '../domain/reconcile'
-import { TransitDiagram } from '../components/TransitDiagram'
-import { DiscrepancyQueue } from '../components/DiscrepancyQueue'
-import { Button, EmptyState, Field, Panel, ShareBar, StatusBadge, StatusDot } from '../components/ui'
+import { DeliveryChart } from '../components/DeliveryChart'
+import { EvidenceChain } from '../components/EvidenceChain'
+import {
+  Button,
+  Callout,
+  EmptyState,
+  Field,
+  Metric,
+  Panel,
+  StatusBadge,
+  StatusDot,
+  Textarea,
+} from '../components/ui'
 
-function StatCard({ label, value, detail, tone = 'neutral' }) {
-  const toneText =
-    tone === 'flagged'
-      ? 'text-status-text-flagged'
-      : tone === 'verified'
-        ? 'text-status-text-verified'
-        : tone === 'pending'
-          ? 'text-status-text-pending'
-          : 'text-porcelain-100'
-  return (
-    <div className="bg-midnight-800 border border-midnight-700 rounded-lg px-5 py-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-porcelain-200">
-        {tone !== 'neutral' && <StatusDot tone={tone} size="sm" />}
-        {label}
-      </div>
-      <div className={`text-3xl font-semibold mt-2 ${toneText}`}>{value}</div>
-      {detail && <div className="text-[11px] text-porcelain-200 mt-1">{detail}</div>}
-    </div>
-  )
-}
+/** Review queue: each finding explains itself in a sentence. */
+function FindingsQueue({ onOpenProject }) {
+  const { state, dispatch, projectViews } = useStore()
+  const all = state.discrepancies
+    .map((d) => {
+      const project = projectViews.find((p) => p.id === d.projectId)
+      const milestone = project?.milestones.find((m) => m.id === d.milestoneId)
+      return { ...d, project, milestone, isLive: d.status === 'open' || d.status === 'under_review' }
+    })
+    .sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt))
 
-function CheckRow({ check }) {
-  const passed = !check.deviates
-  return (
-    <li className="flex items-start gap-3 py-2.5">
-      <span
-        className={`mt-0.5 text-xs ${passed ? 'text-status-text-verified' : 'text-status-text-flagged'}`}
-        aria-hidden="true"
-      >
-        {passed ? '✓' : '⚠'}
-      </span>
-      <div className="min-w-0">
-        <div className="text-xs font-medium">
-          {DISCREPANCY_KIND_META[check.kind]?.label ?? check.kind}
-          <span className="ml-2 font-normal text-porcelain-200">
-            {passed ? 'within tolerance' : `${check.severity} severity`}
-          </span>
-        </div>
-        <p className="text-xs text-porcelain-200 mt-0.5 leading-relaxed">{check.detail}</p>
-      </div>
-    </li>
-  )
-}
+  const live = all.filter((d) => d.isLive)
+  const closed = all.filter((d) => !d.isLive)
 
-function ProjectDetail({ project }) {
-  const { dispatch } = useStore()
-  const milestone = project.milestones[0]
-  if (!milestone) return null
+  const [activeId, setActiveId] = useState(() => live[0]?.id ?? all[0]?.id)
+  const [resolution, setResolution] = useState('')
+  const active = all.find((d) => d.id === activeId) ?? all[0]
 
-  const [quantity, setQuantity] = useState('')
-  const [note, setNote] = useState('')
+  if (all.length === 0) {
+    return (
+      <EmptyState title="No discrepancies on record">
+        Every claim filed in this ward is either awaiting inspection or has been independently
+        confirmed. Nothing requires an officer&rsquo;s decision.
+      </EmptyState>
+    )
+  }
 
-  const tone =
-    project.status === 'flagged'
-      ? 'flagged'
-      : project.status === 'verified'
-        ? 'verified'
-        : project.status === 'resolved'
-          ? 'verified'
-          : 'pending'
+  const act = (type) => {
+    if (!active || !resolution.trim()) return
+    dispatch({
+      type,
+      payload: {
+        discrepancyId: active.id,
+        resolvedBy: 'Ward Officer',
+        resolution: resolution.trim(),
+      },
+    })
+    setResolution('')
+  }
 
   return (
-    <div className="space-y-4">
-      <Panel
-        title={project.name}
-        subtitle={`${project.id} · ${project.ward} · Zone ${project.zone}`}
-        actions={
-          <StatusBadge
-            tone={tone}
-            label={project.status === 'resolved' ? 'Resolved' : PROJECT_STATUS_META[project.status]?.label ?? project.status}
-          />
-        }
-      >
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <Field label="Contractor" className="col-span-2">
-            {project.contractor}
-          </Field>
-          <Field label="Location" className="col-span-2">
-            <span className="text-xs leading-relaxed">{project.location}</span>
-          </Field>
-          <Field label="Sanctioned budget" mono>
-            {formatRupees(project.budget)}
-          </Field>
-          <Field label="Sanctioned on" mono>
-            {project.sanctionedOn}
-          </Field>
-        </div>
-
-        {/* Three sources of truth, side by side */}
-        <div className="border-t border-midnight-700 pt-4">
-          <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-3">
-            Milestone {milestone.id} — {milestone.title}
-          </h3>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[
-              {
-                label: 'Approved',
-                value: formatQuantity(
-                  milestone.commitment.quantity,
-                  milestone.commitment.unit
-                ),
-                sub: 'Sanctioned scope',
-              },
-              {
-                label: 'Reported',
-                value: milestone.report
-                  ? formatQuantity(
-                      milestone.report.claimedQuantity,
-                      milestone.commitment.unit
-                    )
-                  : '—',
-                sub: milestone.report ? milestone.report.reportedBy : 'No claim filed',
-              },
-              {
-                label: 'Observed',
-                value: milestone.inspection
-                  ? formatQuantity(
-                      milestone.inspection.observedQuantity,
-                      milestone.commitment.unit
-                    )
-                  : '—',
-                sub: milestone.inspection
-                  ? milestone.inspection.inspectedBy
-                  : 'Not yet inspected',
-              },
-            ].map((cell, i) => (
-              <div
-                key={cell.label}
-                className={`rounded border px-3 py-3 ${
-                  i === 2 && milestone.inspection && milestone.deviations.length > 0
-                    ? 'border-status-flagged/40 bg-status-tint-flagged'
-                    : 'border-midnight-700 bg-midnight-950'
-                }`}
-              >
-                <div className="text-[10px] uppercase tracking-wider text-porcelain-200">
-                  {cell.label}
-                </div>
-                <div className="text-lg font-mono mt-1">{cell.value}</div>
-                <div className="text-[10px] text-porcelain-200 mt-1 leading-snug">
-                  {cell.sub}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <ShareBar
-            label={`Physical completion against commitment (${milestone.completion.basis})`}
-            percent={milestone.completion.percent}
-            tone={milestone.completion.percent >= 100 ? 'verified' : 'flagged'}
-          />
-        </div>
-
-        {/* Reconciliation working */}
-        <div className="border-t border-midnight-700 mt-5 pt-4">
-          <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-1">
-            Reconciliation
-          </h3>
-          <p className="text-[11px] text-porcelain-200 mb-2">
-            Tolerances: reported ±{Math.round(TOLERANCE.reportVsApproved * 100)}% of
-            approved, observed ±{Math.round(TOLERANCE.observedVsReported * 100)}% of
-            reported.
-          </p>
-          {milestone.checks.length === 0 ? (
-            <p className="text-xs text-porcelain-200 py-3">
-              Nothing to reconcile yet — no claim has been filed against this milestone.
-            </p>
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+      <div className="space-y-4">
+        <Panel title="Needs a decision" subtitle={`${live.length} open`} className="[&>div]:p-0">
+          {live.length === 0 ? (
+            <p className="text-sm text-ink-muted px-5 py-4">Nothing open.</p>
           ) : (
-            <ul className="divide-y divide-midnight-700">
-              {milestone.checks.map((c, i) => (
-                <CheckRow key={`${c.kind}-${i}`} check={c} />
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {milestone.discrepancies.length > 0 && (
-          <div className="border-t border-midnight-700 mt-5 pt-4">
-            <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-3">
-              Findings on record
-            </h3>
-            <ul className="space-y-2">
-              {milestone.discrepancies.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center gap-3 text-xs bg-midnight-950 border border-midnight-700 rounded px-3 py-2.5"
-                >
-                  <StatusDot
-                    tone={d.status === 'resolved' ? 'verified' : d.status === 'dismissed' ? 'neutral' : 'flagged'}
-                    size="sm"
-                    pulse={d.status === 'open'}
-                  />
-                  <span className="font-mono text-porcelain-200">{d.id}</span>
-                  <span className="truncate">{DISCREPANCY_KIND_META[d.kind]?.label ?? d.kind}</span>
-                  <span className="ml-auto shrink-0">
-                    <StatusBadge
-                      tone={d.status === 'resolved' ? 'verified' : d.status === 'dismissed' ? 'neutral' : 'flagged'}
-                      label={d.status}
-                      size="sm"
-                    />
-                  </span>
+            <ul className="divide-y divide-hairline">
+              {live.map((d) => (
+                <li key={d.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(d.id)}
+                    aria-current={active?.id === d.id}
+                    className={`w-full text-left px-4 py-3 transition-colors ${
+                      active?.id === d.id ? 'bg-sunken' : 'hover:bg-canvas'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <StatusDot
+                        tone={d.severity === 'high' ? 'flagged' : 'pending'}
+                        pulse={d.severity === 'high'}
+                      />
+                      <span className="font-mono text-xs text-ink-muted">{d.id}</span>
+                      <span className="ml-auto text-2xs text-ink-muted capitalize">{d.severity}</span>
+                    </div>
+                    <div className="text-sm font-medium text-ink mt-1">
+                      {DISCREPANCY_KIND_META[d.kind]?.label ?? d.kind}
+                    </div>
+                    <div className="text-xs text-ink-muted mt-0.5">{d.project?.name}</div>
+                  </button>
                 </li>
               ))}
             </ul>
-          </div>
-        )}
-
-        {/* Inspector capture, reachable from the map for the walkthrough */}
-        <div className="border-t border-midnight-700 mt-5 pt-4">
-          <h3 className="text-[10px] uppercase tracking-wider text-porcelain-200 mb-3">
-            Record an independent observation
-          </h3>
-          {milestone.inspection ? (
-            <div className="text-xs text-porcelain-200 bg-midnight-950 border border-midnight-700 rounded px-3 py-3 leading-relaxed">
-              Observed {formatQuantity(milestone.inspection.observedQuantity, milestone.commitment.unit)} by{' '}
-              {milestone.inspection.inspectedBy}. Filing a new contractor claim clears this
-              observation, because old evidence cannot vouch for new work.
-            </div>
-          ) : (
-            <form
-              className="space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!quantity) return
-                dispatch({
-                  type: 'RECORD_INSPECTION',
-                  payload: {
-                    projectId: project.id,
-                    milestoneId: milestone.id,
-                    observedQuantity: Number(quantity),
-                    inspectedBy: 'Insp. R. Karthikeyan',
-                    note,
-                  },
-                })
-                setQuantity('')
-                setNote('')
-              }}
-            >
-              <div className="grid grid-cols-[140px_1fr] gap-3 items-end">
-                <label className="block">
-                  <span className="block text-[10px] uppercase tracking-wider text-porcelain-200 mb-1.5">
-                    Observed ({milestone.commitment.unit})
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder={String(milestone.commitment.quantity)}
-                    className="w-full bg-midnight-950 border border-midnight-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-status-verified"
-                  />
-                </label>
-                <label className="block">
-                  <span className="block text-[10px] uppercase tracking-wider text-porcelain-200 mb-1.5">
-                    Measurement note
-                  </span>
-                  <input
-                    type="text"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Where it was measured from, what was found"
-                    className="w-full bg-midnight-950 border border-midnight-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-status-verified"
-                  />
-                </label>
-              </div>
-              <Button variant="primary" type="submit" disabled={!quantity}>
-                Record observation and reconcile
-              </Button>
-            </form>
           )}
-        </div>
-      </Panel>
+        </Panel>
+
+        {closed.length > 0 && (
+          <Panel title="Decided" subtitle={`${closed.length} closed`} className="[&>div]:p-0">
+            <ul className="divide-y divide-hairline">
+              {closed.map((d) => (
+                <li key={d.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(d.id)}
+                    aria-current={active?.id === d.id}
+                    className={`w-full text-left px-4 py-2.5 ${
+                      active?.id === d.id ? 'bg-sunken' : 'hover:bg-canvas'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-ink-muted">{d.id}</span>
+                      <span className="ml-auto">
+                        <StatusBadge
+                          tone={d.status === 'resolved' ? 'verified' : 'neutral'}
+                          label={DISCREPANCY_STATUS_META[d.status]?.label ?? d.status}
+                          size="sm"
+                        />
+                      </span>
+                    </div>
+                    <div className="text-xs text-ink-muted mt-1">{d.project?.name}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
+      </div>
+
+      {active && (
+        <Panel
+          title={DISCREPANCY_KIND_META[active.kind]?.label ?? active.kind}
+          subtitle={`${active.id} · ${active.project?.name}`}
+          actions={
+            <StatusBadge
+              tone={active.severity === 'high' ? 'flagged' : 'pending'}
+              label={`${active.severity} severity`}
+            />
+          }
+        >
+          <div className="space-y-5">
+            {/* The explanation, in the same four-step form used everywhere else */}
+            {active.milestone && (
+              <EvidenceChain milestone={active.milestone} project={active.project} />
+            )}
+
+            {active.isLive ? (
+              <div className="pt-5 border-t border-hairline">
+                <h3 className="text-base font-semibold text-ink mb-1">Your decision</h3>
+                <p className="text-sm text-ink-muted mb-4 leading-relaxed">
+                  The system has flagged a difference. It does not decide who is right — that is
+                  your call, and your reason becomes part of the public record. Both outcomes are
+                  legitimate: sometimes the work is genuinely short, and sometimes the
+                  measurement was wrong.
+                </p>
+                <Textarea
+                  id="resolution"
+                  label="Reason for your decision (published)"
+                  placeholder="e.g. Contractor directed to surface the remaining 180 m within 30 days; re-inspection scheduled."
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value)}
+                  hint="This text appears in the citizen record. A decision cannot be recorded without one."
+                />
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <Button
+                    variant="danger"
+                    disabled={!resolution.trim()}
+                    onClick={() => act('RESOLVE_DISCREPANCY')}
+                  >
+                    Uphold the finding — work is short
+                  </Button>
+                  <Button
+                    variant="success"
+                    disabled={!resolution.trim()}
+                    onClick={() => act('DISMISS_DISCREPANCY')}
+                  >
+                    Dismiss — the measurement was wrong
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-5 border-t border-hairline">
+                <h3 className="text-2xs uppercase tracking-wide text-ink-muted mb-2">
+                  Decision recorded
+                </h3>
+                <p className="text-sm text-ink-2 leading-relaxed bg-canvas border border-hairline rounded px-4 py-3">
+                  {active.resolution || 'No reason recorded.'}
+                </p>
+                <p className="text-xs text-ink-muted mt-2">
+                  By {active.resolvedBy}
+                  {active.resolvedAt &&
+                    ` · ${new Date(active.resolvedAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}`}
+                </p>
+              </div>
+            )}
+          </div>
+        </Panel>
+      )}
     </div>
   )
 }
@@ -306,109 +225,242 @@ function ProjectDetail({ project }) {
 function AuditTrail() {
   const { state } = useStore()
   const entries = selectAuditLog(state)
-
-  const ROLE_TONE = {
-    system: 'pending',
-    contractor: 'neutral',
-    inspector: 'verified',
-    admin: 'flagged',
-  }
+  const ROLE_TONE = { system: 'info', contractor: 'neutral', inspector: 'verified', admin: 'flagged' }
 
   return (
-    <Panel
-      title="Audit trail"
-      subtitle={`${entries.length} entries · append-only`}
-      className="max-w-3xl"
-    >
-      <ol className="space-y-0">
-        {entries.map((e, i) => (
-          <li key={e.id} className="flex gap-4 py-3 border-b border-midnight-700 last:border-0">
-            <div className="w-32 shrink-0">
-              <div className="text-[11px] font-mono text-porcelain-200">
-                {new Date(e.at).toLocaleDateString('en-IN', {
-                  day: '2-digit',
-                  month: 'short',
-                })}
+    <div className="max-w-3xl">
+      <Panel
+        title="Audit trail"
+        subtitle={`${entries.length} entries, newest first. Entries are only ever added — nothing is edited or deleted.`}
+      >
+        <ol>
+          {entries.map((e) => (
+            <li
+              key={e.id}
+              className="flex gap-4 py-3 border-b border-hairline last:border-0"
+            >
+              <div className="w-24 shrink-0">
+                <div className="text-xs font-mono text-ink-muted">
+                  {new Date(e.at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                </div>
+                <div className="text-2xs font-mono text-ink-muted">
+                  {new Date(e.at).toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
               </div>
-              <div className="text-[10px] text-porcelain-200/70 font-mono">
-                {new Date(e.at).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusDot tone={ROLE_TONE[e.role] ?? 'neutral'} size="sm" />
+                  <span className="text-sm font-medium text-ink capitalize">
+                    {e.action.replace(/_/g, ' ')}
+                  </span>
+                  <span className="font-mono text-xs text-ink-muted">{e.subject}</span>
+                </div>
+                <p className="text-sm text-ink-2 mt-1 leading-relaxed">{e.note}</p>
+                <div className="text-xs text-ink-muted mt-0.5">
+                  {e.actor} · {e.role}
+                </div>
               </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusDot tone={ROLE_TONE[e.role] ?? 'neutral'} size="sm" />
-                <span className="text-xs font-medium">{e.action.replace(/_/g, ' ')}</span>
-                <span className="text-[10px] font-mono text-porcelain-200">{e.subject}</span>
-              </div>
-              <p className="text-xs text-porcelain-200 mt-1 leading-relaxed">{e.note}</p>
-              <div className="text-[10px] text-porcelain-200/70 mt-0.5">
-                {e.actor} · {e.role}
-              </div>
-            </div>
-            <div className="text-[10px] font-mono text-porcelain-200/50 shrink-0">
-              #{entries.length - i}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Panel>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+    </div>
+  )
+}
+
+function ProjectDetail({ project }) {
+  const { dispatch } = useStore()
+  const [quantity, setQuantity] = useState('')
+  const [note, setNote] = useState('')
+
+  const milestone = project.milestones[0]
+  if (!milestone) return null
+  const unit = milestone.commitment.unit === 'metre' ? 'm' : milestone.commitment.unit
+
+  const tone =
+    project.status === 'flagged'
+      ? 'flagged'
+      : project.status === 'verified' || project.status === 'resolved'
+        ? 'verified'
+        : 'pending'
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title={project.name}
+        subtitle={`${project.id} · ${project.ward} · ${project.contractor}`}
+        actions={
+          <StatusBadge
+            tone={tone}
+            label={PROJECT_STATUS_META[project.status]?.label ?? project.status}
+          />
+        }
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+          <Field label="Sanctioned budget" mono>
+            {formatRupees(project.budget)}
+          </Field>
+          <Field label="Sanctioned on" mono>
+            {project.sanctionedOn}
+          </Field>
+          <Field label="Location" className="col-span-2 sm:col-span-1">
+            <span className="text-xs leading-snug">{project.location}</span>
+          </Field>
+        </div>
+
+        <EvidenceChain milestone={milestone} project={project} />
+
+        {/* Recording an observation from here too, for the walkthrough */}
+        <div className="mt-6 pt-5 border-t border-hairline">
+          <h3 className="text-sm font-semibold text-ink mb-1">
+            Record an independent measurement
+          </h3>
+          {milestone.inspection ? (
+            <Callout tone="verified" title="Already measured">
+              An officer recorded {formatQuantity(milestone.inspection.observedQuantity, unit)} on
+              site. Filing a new contractor claim clears this reading, because old evidence cannot
+              vouch for new work.
+            </Callout>
+          ) : (
+            <>
+              <p className="text-sm text-ink-muted mb-3 leading-relaxed">
+                {milestone.report
+                  ? `The contractor has claimed ${formatQuantity(milestone.report.claimedQuantity, unit)}. Measure the site and enter what you actually find — the system will compare the two.`
+                  : 'Nothing has been claimed against this milestone yet.'}
+              </p>
+              {milestone.report && (
+                <form
+                  className="space-y-3"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (!quantity) return
+                    dispatch({
+                      type: 'RECORD_INSPECTION',
+                      payload: {
+                        projectId: project.id,
+                        milestoneId: milestone.id,
+                        observedQuantity: Number(quantity),
+                        inspectedBy: 'Insp. R. Karthikeyan',
+                        note,
+                      },
+                    })
+                    setQuantity('')
+                    setNote('')
+                  }}
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
+                    <label className="block">
+                      <span className="block text-2xs uppercase tracking-wide text-ink-muted mb-1.5">
+                        Measured on site ({unit})
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        placeholder={String(milestone.report.claimedQuantity)}
+                        className="w-full bg-paper border border-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-status-verified focus:ring-2 focus:ring-status-verified/20"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-2xs uppercase tracking-wide text-ink-muted mb-1.5">
+                        What you found
+                      </span>
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Where you measured from and what is physically present"
+                        className="w-full bg-paper border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-status-verified focus:ring-2 focus:ring-status-verified/20"
+                      />
+                    </label>
+                  </div>
+                  <Button variant="primary" type="submit" disabled={!quantity}>
+                    Record measurement and compare
+                  </Button>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+      </Panel>
+    </div>
   )
 }
 
 export default function AdminDashboard() {
   const { state, projectViews } = useStore()
   const summary = selectSummary(state, projectViews)
-  const [view, setView] = useState('map')
+  const [view, setView] = useState('overview')
   const [selectedId, setSelectedId] = useState(
     () => projectViews.find((p) => p.status === 'flagged')?.id ?? projectViews[0]?.id
   )
-
-  const selected = projectViews.find((p) => p.id === selectedId) ?? projectViews[0]
+  const selected = projectViews.find((p) => p.id === selectedId)
 
   const TABS = [
-    { id: 'map', label: 'Ward Map' },
-    { id: 'queue', label: `Findings${summary.openDiscrepancies ? ` (${summary.openDiscrepancies})` : ''}` },
-    { id: 'audit', label: 'Audit Trail' },
+    { id: 'overview', label: 'Ward overview' },
+    {
+      id: 'findings',
+      label: `Discrepancies${summary.openDiscrepancies ? ` (${summary.openDiscrepancies})` : ''}`,
+    },
+    { id: 'audit', label: 'Audit trail' },
   ]
 
   return (
-    <div className="space-y-5">
-      {/* Stats */}
+    <div className="space-y-6">
+      {/* The answer, before any detail */}
+      <div>
+        <h1 className="text-2xl font-semibold text-ink">
+          {summary.openDiscrepancies === 0
+            ? 'No discrepancies need a decision'
+            : summary.openDiscrepancies === 1
+              ? 'One discrepancy needs a decision'
+              : `${summary.openDiscrepancies} discrepancies need a decision`}
+        </h1>
+        <p className="text-sm text-ink-muted mt-1.5 max-w-3xl leading-relaxed">
+          Every project below is measured against what was sanctioned. A bar stops where an
+          independent inspection found the work to end — anything beyond that is a claim the
+          site does not support.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+        <Metric
           label="Projects tracked"
           value={summary.projects}
-          detail={formatRupees(summary.totalBudget) + ' sanctioned'}
+          detail={`${formatRupeesShort(summary.totalBudget)} sanctioned in total`}
+          emphasis
         />
-        <StatCard
-          label="Open findings"
+        <Metric
+          label="Open discrepancies"
           value={summary.openDiscrepancies}
           tone={summary.openDiscrepancies > 0 ? 'flagged' : 'verified'}
           detail={
-            summary.highSeverity > 0
-              ? `${summary.highSeverity} high severity`
-              : 'None at high severity'
+            summary.highSeverity > 0 ? `${summary.highSeverity} high severity` : 'None high severity'
           }
+          emphasis
         />
-        <StatCard
+        <Metric
           label="Awaiting inspection"
           value={summary.awaitingInspection}
           tone={summary.awaitingInspection > 0 ? 'pending' : 'verified'}
-          detail="Claims filed without an observation"
+          detail="Claimed but unverified"
+          emphasis
         />
-        <StatCard
-          label="Verified"
+        <Metric
+          label="Fully verified"
           value={summary.verified}
           tone="verified"
-          detail="Claim matched independent observation"
+          detail="Inspection matched the claim"
+          emphasis
         />
       </div>
 
-      {/* View switcher */}
-      <div className="flex items-center gap-1 border-b border-midnight-700">
+      <div className="flex items-center gap-1 border-b border-hairline">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -417,8 +469,8 @@ export default function AdminDashboard() {
             aria-current={view === t.id}
             className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors ${
               view === t.id
-                ? 'border-b-status-flagged text-porcelain-100 font-medium'
-                : 'border-b-transparent text-porcelain-200 hover:text-porcelain-100'
+                ? 'border-b-ink text-ink font-semibold'
+                : 'border-b-transparent text-ink-muted hover:text-ink'
             }`}
           >
             {t.label}
@@ -426,61 +478,13 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {view === 'map' && (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-5 items-start">
-          <div className="space-y-4">
-            <TransitDiagram
-              projects={projectViews}
-              selectedId={selected?.id}
-              onSelect={setSelectedId}
-            />
-            <Panel title="Ward register" className="[&>div]:p-0">
-              <ul className="divide-y divide-midnight-700">
-                {projectViews.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(p.id)}
-                      className={`w-full text-left px-5 py-3 flex items-center gap-3 transition-colors ${
-                        selected?.id === p.id ? 'bg-midnight-950' : 'hover:bg-midnight-950/60'
-                      }`}
-                    >
-                      <StatusDot
-                        tone={
-                          p.status === 'flagged'
-                            ? 'flagged'
-                            : p.status === 'verified' || p.status === 'resolved'
-                              ? 'verified'
-                              : 'pending'
-                        }
-                        pulse={p.status === 'flagged'}
-                      />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{p.name}</div>
-                        <div className="text-[11px] text-porcelain-200 font-mono">
-                          {p.id} · {p.contractor}
-                        </div>
-                      </div>
-                      <div className="ml-auto shrink-0 text-right">
-                        <StatusBadge
-                          tone={
-                            p.status === 'flagged'
-                              ? 'flagged'
-                              : p.status === 'verified' || p.status === 'resolved'
-                                ? 'verified'
-                                : 'pending'
-                          }
-                          label={PROJECT_STATUS_META[p.status]?.label ?? p.status}
-                          size="sm"
-                        />
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          </div>
-
+      {view === 'overview' && (
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
+          <DeliveryChart
+            projects={projectViews}
+            selectedId={selected?.id}
+            onSelect={setSelectedId}
+          />
           {selected ? (
             <ProjectDetail project={selected} />
           ) : (
@@ -489,7 +493,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {view === 'queue' && <DiscrepancyQueue onOpenProject={(id) => { setSelectedId(id); setView('map') }} />}
+      {view === 'findings' && <FindingsQueue />}
       {view === 'audit' && <AuditTrail />}
     </div>
   )

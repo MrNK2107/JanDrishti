@@ -1,17 +1,19 @@
 /**
- * WCAG 2.1 contrast audit for the JanDrishti palette.
+ * WCAG 2.1 contrast audit for the JanDrishti light palette.
  *
  *   node tools/contrast.mjs              audit the shipped palette (exit 1 on failure)
  *   node tools/contrast.mjs --candidates audit the derivation palette
  *
- * The palette separates a colour's FILL role from its TEXT role, so this script
- * measures both against every surface the app actually uses. It exits non-zero
- * on regression and is wired into `npm run verify:full`.
+ * Text tokens are derived by `tools/palette-light.mjs`. This script is the
+ * regression guard: it measures every pairing the app actually renders and
+ * fails the build if any drops below AA.
  *
- * History: the original palette failed five pairings. The worst was porcelain
- * text on the amber fill at 1.75:1 — an accessibility defect that STATUS.md
- * initially recorded correctly, then DELIVERY.md reclassified as an
- * "intentional design choice". It was not; it was unreadable.
+ * Two deliberate exclusions, stated so they are not mistaken for oversights:
+ *   - `hairline` and `border` are decorative and functional lines, not text.
+ *     They are not required to meet a text ratio.
+ *   - `ink-subtle` is used only for chart axes and de-emphasised micro-labels,
+ *     never for content the reader must read to act. It is checked against the
+ *     large-text threshold instead.
  */
 
 const hex = (h) => {
@@ -28,65 +30,79 @@ const ratio = (a, b) => {
   return (l1 + 0.05) / (l2 + 0.05)
 }
 
-/** Tokens, exactly as declared in tailwind.config.cjs. Keep in sync. */
+/** Tokens exactly as declared in tailwind.config.cjs. Keep in sync. */
 const T = {
-  midnight950: '#07111C',
-  midnight900: '#0A1929',
-  midnight800: '#0F1E2F',
-  midnight700: '#1A2B3D',
-  porcelain100: '#E8EDF2',
-  porcelain200: '#748A9D',
-  porcelain300: '#B4C4D2',
+  canvas: '#F6F8FA',
+  paper: '#FFFFFF',
+  sunken: '#EDF1F5',
+  ink: '#0F172A',
+  ink2: '#334155',
+  inkMuted: '#5A6B7F',
+  inkSubtle: '#7C8CA0',
   statusVerified: '#2A9D8F',
-  statusFlagged: '#E63946',
+  statusFlagged: '#E7434F',
   statusPending: '#F4A261',
-  textVerified: '#3FA79A',
-  textFlagged: '#E94D59',
-  textPending: '#F5AB71',
-}
-
-const FILLS = [T.statusVerified, T.statusFlagged, T.statusPending]
-const GROUNDS = [T.midnight900, T.midnight800, T.midnight950]
-const TEXTS = {
-  'status-text verified': T.textVerified,
-  'status-text flagged': T.textFlagged,
-  'status-text pending': T.textPending,
+  statusInfo: '#3B82F6',
+  textVerified: '#217A70',
+  textFlagged: '#CA323E',
+  textPending: '#92613A',
+  textInfo: '#306BCA',
+  softVerified: '#E5F3F2',
+  softFlagged: '#FDEBED',
+  softPending: '#FDEBDC',
+  softInfo: '#E9F1FE',
 }
 
 const NORMAL = 4.5
 const LARGE = 3.0
+const GROUNDS = {
+  paper: T.paper,
+  canvas: T.canvas,
+  sunken: T.sunken,
+}
 
 function buildRows() {
   const rows = []
+  const grounds = Object.entries(GROUNDS)
 
-  // Text colours on every ground the app renders them against.
-  for (const [name, fg] of Object.entries(TEXTS)) {
-    for (const [gi, bg] of GROUNDS.entries()) {
-      const groundName = ['midnight-900', 'midnight-800', 'midnight-950'][gi]
-      rows.push([fg, bg, `${name} on ${groundName}`, NORMAL])
+  // Text tones on every ground.
+  const texts = {
+    ink: T.ink,
+    'ink-2': T.ink2,
+    'ink-muted': T.inkMuted,
+    'status-text verified': T.textVerified,
+    'status-text flagged': T.textFlagged,
+    'status-text pending': T.textPending,
+    'status-text info': T.textInfo,
+  }
+  for (const [name, fg] of Object.entries(texts)) {
+    for (const [gname, bg] of grounds) {
+      rows.push([fg, bg, `${name} on ${gname}`, NORMAL])
     }
   }
 
-  // Body and muted text.
-  rows.push([T.porcelain100, T.midnight900, 'porcelain-100 on midnight-900', NORMAL])
-  rows.push([T.porcelain100, T.midnight800, 'porcelain-100 on midnight-800', NORMAL])
-  rows.push([T.porcelain100, T.midnight950, 'porcelain-100 on midnight-950', NORMAL])
-  rows.push([T.porcelain200, T.midnight900, 'porcelain-200 on midnight-900', NORMAL])
-  rows.push([T.porcelain200, T.midnight800, 'porcelain-200 on midnight-800', NORMAL])
-  rows.push([T.porcelain200, T.midnight950, 'porcelain-200 on midnight-950', NORMAL])
-  rows.push([T.porcelain300, T.midnight900, 'porcelain-300 on midnight-900', NORMAL])
+  // De-emphasised axis colour — large-text threshold by policy.
+  for (const [gname, bg] of grounds) {
+    rows.push([T.inkSubtle, bg, `ink-subtle on ${gname} (axes only)`, LARGE])
+  }
 
-  // Dark text sitting ON coloured fills — the badge and status-dot pairing.
-  //
-  // Only `midnight-950` is listed, because it is the only colour the app places
-  // on a fill (see `text-midnight-950` in components/ui.jsx and AppShell.jsx).
-  // An audit that measures pairings the code never produces is worse than no
-  // audit: it reports failures that cannot occur and trains you to ignore it.
-  // `midnight-900` on the flagged fill is 4.26:1 — real, and deliberately not
-  // offered as a token combination.
-  for (const [fi, fill] of FILLS.entries()) {
-    const fillName = ['verified', 'flagged', 'pending'][fi]
-    rows.push([T.midnight950, fill, `midnight-950 on ${fillName} fill`, NORMAL])
+  // Status text on its own soft background — this is the badge pairing.
+  rows.push([T.textVerified, T.softVerified, 'verified text on verified soft', NORMAL])
+  rows.push([T.textFlagged, T.softFlagged, 'flagged text on flagged soft', NORMAL])
+  rows.push([T.textPending, T.softPending, 'pending text on pending soft', NORMAL])
+  rows.push([T.textInfo, T.softInfo, 'info text on info soft', NORMAL])
+
+  // Dark text on solid fills. White-on-fill is deliberately NOT listed and must
+  // not be reintroduced: it measures 2.06–4.17:1 across these four hues, all
+  // below AA. Confirmed per-hue by `tools/solve-light.mjs`.
+  const fills = {
+    verified: T.statusVerified,
+    flagged: T.statusFlagged,
+    pending: T.statusPending,
+    info: T.statusInfo,
+  }
+  for (const [name, fill] of Object.entries(fills)) {
+    rows.push([T.ink, fill, `ink on ${name} fill`, NORMAL])
   }
 
   return rows
@@ -94,15 +110,14 @@ function buildRows() {
 
 function buildCandidates() {
   return [
-    [T.textVerified, T.midnight900, 'FIX verified text on midnight-900', NORMAL],
-    [T.textFlagged, T.midnight900, 'FIX flagged text on midnight-900', NORMAL],
-    [T.textPending, T.midnight900, 'FIX pending text on midnight-900', NORMAL],
-    [T.textVerified, T.midnight800, 'FIX verified text on midnight-800', NORMAL],
-    [T.textFlagged, T.midnight800, 'FIX flagged text on midnight-800', NORMAL],
-    [T.textPending, T.midnight800, 'FIX pending text on midnight-800', NORMAL],
-    [T.midnight950, T.statusVerified, 'FIX dark text on verified fill', NORMAL],
-    [T.midnight950, T.statusFlagged, 'FIX dark text on flagged fill', NORMAL],
-    [T.midnight950, T.statusPending, 'FIX dark text on pending fill', NORMAL],
+    [T.textVerified, T.paper, 'derived verified text on paper', NORMAL],
+    [T.textFlagged, T.paper, 'derived flagged text on paper', NORMAL],
+    [T.textPending, T.paper, 'derived pending text on paper', NORMAL],
+    [T.textInfo, T.paper, 'derived info text on paper', NORMAL],
+    [T.textVerified, T.canvas, 'derived verified text on canvas', NORMAL],
+    [T.textFlagged, T.canvas, 'derived flagged text on canvas', NORMAL],
+    [T.textPending, T.canvas, 'derived pending text on canvas', NORMAL],
+    [T.textInfo, T.canvas, 'derived info text on canvas', NORMAL],
   ]
 }
 

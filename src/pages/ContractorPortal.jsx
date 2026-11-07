@@ -1,14 +1,11 @@
 /**
- * Contractor Portal — file a completion claim.
+ * Contractor Portal — report work done.
  *
- * This is where the loop starts, so the interface has one job: make it
- * unambiguous what is being claimed *against*. Every field is anchored to the
- * sanctioned scope, and the form states the tolerance the claim will be judged
- * by before it is submitted, not after.
- *
- * The portal cannot mark work complete. Filing a claim moves a milestone to
- * "awaiting inspection" and nothing further — completion is only ever
- * established by independent observation. That asymmetry is the product.
+ * The first step of the cycle, so it states the cycle plainly: what happens to
+ * a claim after it is filed, and why filing it does not finish anything. A
+ * contractor who understands that the inspector is the one who closes the loop
+ * is less likely to overstate a figure — which is the behaviour the product is
+ * trying to encourage, not merely catch.
  */
 
 import { useState } from 'react'
@@ -20,9 +17,9 @@ import {
   formatRupees,
   TOLERANCE,
 } from '../domain/reconcile'
-import { Button, EmptyState, Field, Input, Panel, StatusBadge, StatusDot } from '../components/ui'
+import { Button, Callout, Field, Input, Panel, StatusBadge, StatusDot } from '../components/ui'
 
-const TONE = (status) =>
+const toneOf = (status) =>
   status === 'flagged'
     ? 'flagged'
     : status === 'verified' || status === 'resolved'
@@ -30,7 +27,7 @@ const TONE = (status) =>
       : 'pending'
 
 export default function ContractorPortal() {
-  const { state, dispatch, projectViews } = useStore()
+  const { dispatch, projectViews } = useStore()
   const [projectId, setProjectId] = useState(() => projectViews[0]?.id ?? '')
   const [claimed, setClaimed] = useState('')
   const [note, setNote] = useState('')
@@ -38,19 +35,27 @@ export default function ContractorPortal() {
 
   const project = projectViews.find((p) => p.id === projectId) ?? projectViews[0]
   const milestone = project?.milestones[0]
+  const unit = milestone?.commitment.unit === 'metre' ? 'm' : milestone?.commitment?.unit
 
-  const contractor = project?.contractor ?? 'Contractor'
+  if (!project || !milestone) {
+    return <p className="text-sm text-ink-muted">No sanctioned scope available.</p>
+  }
 
-  const fileClaim = (e) => {
+  const sanctioned = milestone.commitment.quantity
+  const band = sanctioned * TOLERANCE.reportVsApproved
+  const lower = Math.max(0, sanctioned - band)
+  const upper = sanctioned + band
+
+  const submit = (e) => {
     e.preventDefault()
-    if (!milestone || !claimed) return
+    if (!claimed) return
     dispatch({
       type: 'REPORT_MILESTONE',
       payload: {
         projectId: project.id,
         milestoneId: milestone.id,
         claimedQuantity: Number(claimed),
-        reportedBy: contractor,
+        reportedBy: project.contractor,
         note,
         evidenceLabel: 'site-submission.jpg',
       },
@@ -60,176 +65,166 @@ export default function ContractorPortal() {
     setNote('')
   }
 
-  if (!project || !milestone) {
-    return <EmptyState title="No sanctioned scope available">Nothing to claim against.</EmptyState>
-  }
-
-  const toleranceBand = milestone.commitment.quantity * TOLERANCE.reportVsApproved
-  const lower = milestone.commitment.quantity - toleranceBand
-  const upper = milestone.commitment.quantity + toleranceBand
-
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-5 items-start">
-      <div className="space-y-5">
-        {/* Scope selector */}
-        <Panel title="Sanctioned scope" subtitle="Select the milestone you are reporting against">
-          <div className="space-y-2">
-            {projectViews.map((p) =>
-              p.milestones.map((m) => {
-                const active = p.id === project.id && m.id === milestone.id
-                return (
-                  <button
-                    key={`${p.id}-${m.id}`}
-                    type="button"
-                    onClick={() => {
-                      setProjectId(p.id)
-                      setFiled(null)
-                    }}
-                    aria-current={active}
-                    className={`w-full text-left rounded border px-4 py-3 transition-colors ${
-                      active
-                        ? 'border-status-verified bg-midnight-950'
-                        : 'border-midnight-700 hover:bg-midnight-950/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <StatusDot tone={TONE(p.status)} pulse={p.status === 'flagged'} />
-                      <span className="text-sm font-medium truncate">{p.name}</span>
-                      <span className="ml-auto shrink-0">
-                        <StatusBadge
-                          tone={TONE(p.status)}
-                          label={PROJECT_STATUS_META[p.status]?.label ?? p.status}
-                          size="sm"
-                        />
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-porcelain-200 mt-1.5 font-mono">
-                      {p.id} · {m.id} · approved{' '}
-                      {formatQuantity(m.commitment.quantity, m.commitment.unit)}
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </Panel>
-
-        {/* Claim form */}
-        <Panel
-          title="File a completion claim"
-          subtitle={`${project.id} · Milestone ${milestone.id} — ${milestone.title}`}
-        >
-          {/* What is already on record */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-            <Field label="Sanctioned quantity" mono>
-              {formatQuantity(milestone.commitment.quantity, milestone.commitment.unit)}
-            </Field>
-            <Field label="Sanctioned value" mono>
-              {formatRupees(project.budget)}
-            </Field>
-            <Field label="Current claim on record" mono>
-              {milestone.report
-                ? formatQuantity(milestone.report.claimedQuantity, milestone.commitment.unit)
-                : 'None'}
-            </Field>
-          </div>
-
-          <form onSubmit={fileClaim} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-4">
-              <Input
-                id="claimed"
-                label={`Quantity completed (${milestone.commitment.unit})`}
-                type="number"
-                min="0"
-                step="1"
-                value={claimed}
-                onChange={(e) => setClaimed(e.target.value)}
-                placeholder={String(milestone.commitment.quantity)}
-                hint={`Accepted range ±${Math.round(
-                  TOLERANCE.reportVsApproved * 100
-                )}%: ${lower.toFixed(0)}–${upper.toFixed(0)}`}
-              />
-              <Input
-                id="note"
-                label="Work note (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Anything the reviewing officer should know"
-              />
-            </div>
-
-            <div className="text-xs text-porcelain-200 bg-midnight-950 border-l-3 border-l-status-pending rounded-r px-4 py-3 leading-relaxed">
-              Filing a claim does not mark work complete. It moves this milestone to
-              <span className="text-porcelain-100"> awaiting inspection</span>, where an
-              independent officer records what is physically present. Completion is
-              established by that observation, not by this submission.
-            </div>
-
-            <Button variant="primary" type="submit" disabled={!claimed}>
-              Submit claim for inspection
-            </Button>
-          </form>
-
-          {filed && (
-            <div
-              role="status"
-              className="mt-5 text-sm bg-status-tint-pending border border-status-pending/40 rounded px-4 py-3 animate-rise"
-            >
-              <div className="font-medium text-status-text-pending">
-                Claim recorded — awaiting independent inspection
-              </div>
-              <p className="text-xs mt-1.5 text-porcelain-100 leading-relaxed">
-                {formatQuantity(filed.quantity, milestone.commitment.unit)} claimed against{' '}
-                {filed.project}. No finding can be raised until an inspector records an
-                observation.
-              </p>
-            </div>
-          )}
-        </Panel>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-ink">Report work complete</h1>
+        <p className="text-sm text-ink-muted mt-1.5 max-w-3xl leading-relaxed">
+          Choose the sanctioned milestone you have worked on and state how much you have
+          completed. An independent inspector will measure the site — your figure is recorded
+          as your claim, not as the final result.
+        </p>
       </div>
 
-      {/* What happens next */}
-      <Panel title="What the system does with this" subtitle="The evidence requirement">
-        <ol className="space-y-4">
-          {[
-            {
-              n: 1,
-              title: 'Your claim is recorded, not accepted',
-              body: 'The submission is stored with your identity, a timestamp, and an evidence hash. It is one of three numbers, not the answer.',
-            },
-            {
-              n: 2,
-              title: 'The milestone becomes awaiting inspection',
-              body: 'Filing clears any previous observation on this milestone. Earlier evidence cannot vouch for new work.',
-            },
-            {
-              n: 3,
-              title: 'An independent officer measures the site',
-              body: 'Their observation is recorded separately and cannot be edited by you.',
-            },
-            {
-              n: 4,
-              title: 'The system reconciles the two',
-              body: `If the observation differs from your claim by more than ${Math.round(
-                TOLERANCE.observedVsReported * 100
-              )}%, a finding opens automatically and a Ward Officer reviews it.`,
-            },
-          ].map((s) => (
-            <li key={s.n} className="flex gap-3">
-              <span
-                aria-hidden="true"
-                className="shrink-0 w-6 h-6 rounded-full bg-midnight-950 border border-midnight-700 grid place-items-center text-[11px] font-mono text-porcelain-200"
-              >
-                {s.n}
-              </span>
-              <div>
-                <div className="text-sm font-medium">{s.title}</div>
-                <p className="text-xs text-porcelain-200 mt-1 leading-relaxed">{s.body}</p>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+        <div className="space-y-5">
+          <Panel title="Sanctioned scope" subtitle="Pick the milestone you are reporting against">
+            <ul className="space-y-2">
+              {projectViews.flatMap((p) =>
+                p.milestones.map((m) => {
+                  const active = p.id === project.id && m.id === milestone.id
+                  return (
+                    <li key={`${p.id}-${m.id}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProjectId(p.id)
+                          setFiled(null)
+                        }}
+                        aria-current={active}
+                        className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                          active
+                            ? 'border-status-verified bg-status-soft-verified'
+                            : 'border-hairline bg-paper hover:border-border'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <StatusDot tone={toneOf(p.status)} />
+                          <span className="text-sm font-medium text-ink">{p.name}</span>
+                          <span className="ml-auto">
+                            <StatusBadge
+                              tone={toneOf(p.status)}
+                              label={PROJECT_STATUS_META[p.status]?.label ?? p.status}
+                              size="sm"
+                            />
+                          </span>
+                        </div>
+                        <div className="text-xs text-ink-muted mt-1.5 font-mono">
+                          {p.id} · {m.id} · sanctioned{' '}
+                          {formatQuantity(m.commitment.quantity, m.commitment.unit)}
+                        </div>
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </Panel>
+
+          <Panel
+            title="Your claim"
+            subtitle={`${project.id} · milestone ${milestone.id} — ${milestone.title}`}
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+              <Field label="Sanctioned quantity" mono>
+                {formatQuantity(sanctioned, unit)}
+              </Field>
+              <Field label="Sanctioned value" mono>
+                {formatRupees(project.budget)}
+              </Field>
+              <Field label="Currently on record" mono>
+                {milestone.report
+                  ? formatQuantity(milestone.report.claimedQuantity, unit)
+                  : 'No claim yet'}
+              </Field>
+            </div>
+
+            <form onSubmit={submit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-4">
+                <Input
+                  id="claimed"
+                  label={`Quantity completed (${unit})`}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={claimed}
+                  onChange={(e) => setClaimed(e.target.value)}
+                  placeholder={String(sanctioned)}
+                  hint={`Sanctioned ${lower.toFixed(0)}–${upper.toFixed(0)} ${unit}`}
+                />
+                <Input
+                  id="note"
+                  label="Work note (optional)"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Anything the reviewing officer should know"
+                />
               </div>
-            </li>
-          ))}
-        </ol>
-      </Panel>
+
+              <Callout tone="pending" title="Filing a claim does not mark work complete">
+                It moves this milestone to <strong className="font-semibold">awaiting
+                inspection</strong>. An officer then measures the site and records what is
+                physically there. Only that measurement establishes completion.
+              </Callout>
+
+              <Button variant="primary" type="submit" disabled={!claimed}>
+                Submit claim for inspection
+              </Button>
+            </form>
+
+            {filed && (
+              <div className="mt-5">
+                <Callout tone="pending" title="Claim recorded — awaiting inspection">
+                  {formatQuantity(filed.quantity, unit)} claimed against {filed.project}. No
+                  discrepancy can be raised until an inspector records an observation.
+                </Callout>
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <Panel title="What happens next" subtitle="And why it works this way">
+          <ol className="space-y-4">
+            {[
+              {
+                n: '1',
+                t: 'Your claim is recorded, not accepted',
+                b: 'It is stored with your name, the date, and an evidence reference. It becomes one of three figures, not the answer.',
+              },
+              {
+                n: '2',
+                t: 'The milestone becomes awaiting inspection',
+                b: 'Any earlier measurement on this milestone is cleared. Old evidence cannot vouch for new work.',
+              },
+              {
+                n: '3',
+                t: 'An officer measures the site',
+                b: 'Their observation is recorded separately and cannot be edited by you. Neither record overrides the other.',
+              },
+              {
+                n: '4',
+                t: 'The system compares the two',
+                b: `If the measurement differs from your claim by more than ${Math.round(
+                  TOLERANCE.observedVsReported * 100
+                )}%, a discrepancy opens and a Ward Officer decides what happens.`,
+              },
+            ].map((s) => (
+              <li key={s.n} className="flex gap-3">
+                <span
+                  aria-hidden="true"
+                  className="w-6 h-6 rounded-full bg-sunken text-ink-muted grid place-items-center text-xs font-bold shrink-0"
+                >
+                  {s.n}
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-ink">{s.t}</div>
+                  <p className="text-sm text-ink-muted mt-1 leading-relaxed">{s.b}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Panel>
+      </div>
     </div>
   )
 }

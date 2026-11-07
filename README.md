@@ -27,9 +27,9 @@ Submission for the **National Student Ideation Challenge** — Track A
 | Inspector interface | Working — observation capture with immediate reconciliation |
 | Citizen portal | Working — read-only public record |
 | Reconciliation engine | Working — 3 rules, pure and fully tested |
-| Unit tests | 68 passing |
-| Browser verification | 24 checks passing, including a live WCAG audit |
-| Accessibility | 19/19 palette pairings meet WCAG AA |
+| Unit tests | 75 passing |
+| Browser verification | 32 checks passing, including a live pixel-level WCAG audit |
+| Accessibility | 32/32 palette pairings meet WCAG AA |
 | Production build | Clean (~97 kB gzipped) |
 | **Backend** | **Not implemented — see below** |
 | **Demo video** | **Not made — see `VIDEO_SHOTLIST.md`** |
@@ -53,7 +53,7 @@ npm run dev          # http://localhost:3002
 Other scripts:
 
 ```bash
-npm test             # 68 unit tests (domain + store + components)
+npm test             # 75 unit tests (domain, store, explainability)
 npm run contrast     # WCAG audit of the palette; exits 1 on regression
 npm run build        # production build
 npm run verify       # browser verification (needs dev server running)
@@ -111,9 +111,8 @@ src/
 ├── components/
 │   ├── ui.jsx             primitives; owns every status colour
 │   ├── AppShell.jsx       shared chrome across the four portals
-│   ├── TransitDiagram.jsx cadastral grid + transit network
-│   ├── ProjectStation.jsx one project as a station
-│   └── DiscrepancyQueue.jsx the review surface
+│   ├── DeliveryChart.jsx  delivery-against-sanction bars
+│   └── EvidenceChain.jsx  the four-step explanation
 └── pages/             # the four portals
 ```
 
@@ -122,9 +121,14 @@ from the evidence on every render. Keeping a status field alongside the evidence
 would create two sources of truth that can disagree — the exact failure this
 product exists to detect.
 
-**The four portals are one product.** They share one store and are one click
-apart, because the accountability loop is only visible when you move between
-them.
+**Explanations are computed, not written into components.** The sentences that
+explain a shortfall come from `deliveryProgress()` and `projectSummary()` in
+`src/domain/reconcile.js`, so every screen explains the same facts the same way,
+and the wording is unit-tested rather than reviewed by eye.
+
+**The four portals are one product.** They share one store, and the shell
+numbers them in the order the work actually moves — contractor, inspector,
+officer, public — so the cycle is legible without a diagram.
 
 ---
 
@@ -160,7 +164,63 @@ Saidapet is the entry point for the live walkthrough: record an observation
 against it and watch the system decide, rather than being shown a verdict.
 
 State persists to `sessionStorage`, so a reload mid-walkthrough does not discard
-your work. Use **Reset demo data** in the sidebar to return to seed.
+your work. Use **Reset demo** in the header to return to seed.
+
+---
+
+## The interface
+
+The primary visual is a **delivery chart**, not a map. Each project is drawn as a
+bar measured against what was sanctioned, and the bar stops where an independent
+inspection found the work to end. Anything between that point and the
+contractor's claim is drawn as a hatched outline, because it is an assertion
+rather than a measured fact.
+
+```
+T Nagar Main Road Resurfacing                          ! Flagged
+████████████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+Sanctioned 500 m · claimed 500 m · found 320 m · not delivered 180 m
+Short by 180 m. Contractor claims 500 m but inspection found only 320 m —
+64% of the sanctioned 500 m.
+```
+
+Three deliberate choices make it legible rather than decorative:
+
+- **Length carries the magnitude.** Colour only marks reconciliation state, so
+  the chart survives greyscale, colourblindness, and a bad projector.
+- **The claimed-but-not-found span is an outline**, never a solid fill. It is the
+  difference between what somebody asserted and what was verified.
+- **Every row carries a plain-language sentence.** If the chart does not land,
+  the sentence still does — and vice versa.
+
+Selecting a project opens a four-step explanation of how the conclusion was
+reached:
+
+1. **Approved and paid for** — the sanctioned benchmark
+2. **Contractor reported complete** — an assertion, attributed and dated
+3. **Independent inspection** — what was measured on site
+4. **System comparison** — the rule applied, its tolerance, and the real variance
+
+then the conclusion written as a sentence, and any finding with its disposition.
+The tolerance is shown as working, so a reader who disagrees with a flag can see
+exactly which rule fired and by how much.
+
+### Why there is no map
+
+An earlier version drew projects as stations on a transit network over a
+cadastral grid. It was removed because it encoded the wrong thing: a transit
+diagram expresses *sequence and connection*, and this data has neither. The
+projects were not stops on a line, the connecting line meant nothing, and the
+stations sat in a row because that was the only way to arrange them. The visual
+implied structure that did not exist, which is why it explained nothing.
+
+### Why the theme is light
+
+Chosen on measurement, not taste. The status red that failed AA as text on dark
+ground (4.26:1) reaches **4.58:1** on white, and the green needs far less
+darkening. Status colours carry **dark** text here: white on these fills measures
+2.06–4.17:1, below AA. That is also why the original 1.75:1 pairing was a defect
+rather than a style preference.
 
 ---
 
@@ -187,10 +247,10 @@ greyscale screenshot.
 
 ## Testing
 
-**68 unit tests** cover the reconciliation rules, the reducer, the derived
+**75 unit tests** cover the reconciliation rules, the reducer, the derived
 selectors, and the station component. They run in under a second.
 
-**24 browser checks** ([`tools/verify-browser.mjs`](tools/verify-browser.mjs))
+**32 browser checks** ([`tools/verify-browser.mjs`](tools/verify-browser.mjs))
 cover what unit tests cannot: that all four routes render without console
 errors, that the palette passes AA *in rendered pixels*, and that the
 accountability loop closes end to end —

@@ -12,6 +12,8 @@ import {
   completionAgainstCommitment,
   deviations,
   reconcile,
+  projectSummary,
+  round3,
 } from './reconcile'
 
 /** Discrepancies attached to one milestone, newest first. */
@@ -76,13 +78,46 @@ export function selectProjectViews(state) {
       (d) => d.status === 'open' || d.status === 'under_review'
     )
 
-    return {
+    const status = deriveProjectStatus(milestones)
+
+    // Delivery against sanction, summed across every milestone of the project.
+    // This is the figure the map answers with: how much of what was paid for is
+    // independently confirmed to exist on the ground.
+    const sanctioned = milestones.reduce((sum, m) => sum + m.commitment.quantity, 0)
+    const reported = milestones.reduce(
+      (sum, m) => sum + (m.report?.claimedQuantity ?? 0),
+      0
+    )
+    const observed = milestones.reduce(
+      (sum, m) => sum + (m.inspection?.observedQuantity ?? 0),
+      0
+    )
+    const unit = milestones[0]?.commitment.unit ?? 'each'
+
+    const delivery = {
+      sanctioned,
+      reported: reported > 0 ? reported : null,
+      observed: observed > 0 ? observed : null,
+      // Percentages of the sanctioned total.
+      reportedPercent: sanctioned ? round3((reported / sanctioned) * 100) : 0,
+      observedPercent: sanctioned ? round3((observed / sanctioned) * 100) : 0,
+      // Units claimed but not found on inspection — the headline shortfall.
+      missingUnits: round3(Math.max(0, reported - observed)),
+      // All units still unaccounted for against the sanction.
+      outstandingUnits: round3(Math.max(0, sanctioned - observed)),
+      unit,
+      inspected: milestones.some((m) => m.inspection),
+      claimed: milestones.some((m) => m.report),
+    }
+
+    const view = {
       ...project,
       milestones,
-      status: deriveProjectStatus(milestones),
+      status,
       discrepancies,
       liveDiscrepancies: live,
       hasOpenDiscrepancy: live.length > 0,
+      delivery,
       counts: {
         milestones: milestones.length,
         flagged: milestones.filter((m) => m.status === 'flagged').length,
@@ -92,6 +127,12 @@ export function selectProjectViews(state) {
         open: live.length,
       },
     }
+
+    // One plain-language sentence, written for someone who has never seen this
+    // system. Computed here so every screen says the same thing.
+    view.plainSummary = projectSummary(view)
+
+    return view
   })
 }
 

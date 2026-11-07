@@ -15,9 +15,9 @@ still failing. `DELIVERY.md` has been removed; the corrections are recorded in
 
 | Measure | Value | How it was measured |
 |---|---|---|
-| Unit tests | **68 passing** | `npm test` |
-| Browser checks | **24 passing** | `npm run verify` (real Chrome) |
-| Palette pairings | **19/19 meet WCAG AA** | `npm run contrast` + live-DOM audit |
+| Unit tests | **75 passing** | `npm test` |
+| Browser checks | **32 passing** | `npm run verify` (real Chrome) |
+| Palette pairings | **32/32 meet WCAG AA** | `npm run contrast` + live-DOM audit |
 | Production build | **clean, 97 kB gzipped** | `npm run build` |
 | Source size | **~1,900 lines** across `src/` | file count |
 | Runtime dependencies added | **0** | see `package.json` |
