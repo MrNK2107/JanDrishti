@@ -299,3 +299,138 @@ Three changes address that:
 Putting the wording in the domain layer means it is covered by tests and cannot
 drift from the figures it describes — which is precisely how the earlier
 documentation drifted from the code.
+
+---
+
+## D16 — The front door: landing page, authentication, and role-based navigation
+
+**Decided.** The app gained a public homepage, sign in, sign up with role
+selection, sign out, session restore, and route guards. The numbered `1 2 3 4`
+navigation was removed in favour of task-based navigation per role.
+
+**What was wrong.** There was no front door. Four routes assumed the visitor
+already knew what JanDrishti was, who they were there as, and why the numbers
+mattered, then dropped them into a dense ward dashboard. A reviewer's first
+impression was being handed a spreadsheet and asked to work it out.
+
+The numbered steps made this worse rather than better. "1 2 3 4" reads as a
+tutorial for a tool the visitor does not yet understand — it tells them they are
+being walked through something rather than using it. A ward officer does not think
+in numbered steps; they think "which of these needs a decision". So the sidebar
+now lists the tasks a role can perform, and a role that cannot perform a task does
+not see it.
+
+**Why the public record needs no account.** A resident should not have to register
+to see how their ward's money was spent. That is the point of a public record, and
+requiring a login to view it would defeat the product's own argument.
+
+**Why seeded accounts get one-click entry.** Screenshotting four signups during a
+judged walkthrough wastes the time that should be spent on the reconciliation
+logic. The buttons fill the form with a known account; the backend verifies them
+through exactly the same path as a typed login, so nothing is bypassed.
+
+---
+
+## D17 — The API boundary is real; the server behind it is not
+
+**Decided.** Every screen talks to `src/api/client.js`. Behind it sits
+`src/api/mockBackend.js`, which is shaped like a server: JSON envelopes,
+server-side state, latency, validation, HTTP-like errors, persistence.
+
+**Alternatives.** A real Express server on a second port. A hosted Supabase
+project.
+
+**Why not a real server for this submission.** A second process adds a startup
+step, a port to conflict, and a failure mode that lands during the walkthrough
+rather than during development. The reconciliation logic — the part that carries
+the product's claim — is fully exercised either way.
+
+**What this buys, and it is not cosmetic.** Because the API has latency and can
+fail, the UI must handle loading and error states, and those paths now exist
+instead of being dead code. Because state lives behind the boundary, the store is
+a client rather than an owner, and every screen sees what the backend holds rather
+than a private copy.
+
+**What it costs, stated plainly.** Per-browser state, unsigned sessions, a
+non-cryptographic password digest, and a role check that runs in the browser. The
+flow is a faithful demonstration; the security is not real. `STATUS.md` says so,
+and the roadmap starts with replacing this module.
+
+---
+
+## D18 — Six bugs found by building the flow
+
+Recorded because each one would have shipped silently, and because four of the six
+were in the parts written to fix the previous round.
+
+**1. The backend returned live internal arrays.** A caller's snapshot mutated when
+the store changed underneath it. That silently breaks caching and optimistic
+updates, and it is invisible until something downstream misbehaves. Fixed by
+returning deep copies — what a real API does by serialising its response.
+
+**2. `me()` cleared the token it failed to resolve.** A read with a destructive
+side effect. React 18 StrictMode mounts effects twice in development, so the
+second boot raced the first and wiped a valid session: every reload appeared to
+sign the user out. A read must not mutate. Stale tokens are harmless because they
+resolve to nobody.
+
+**3. An abort flag left the app loading forever.** The attempt to make boot
+idempotent for StrictMode set an `aborted` flag in the effect's cleanup, which ran
+before the real mount and suppressed every subsequent dispatch. Dispatching after
+an unmount is already a no-op, so there was nothing to guard against. The boot now
+starts once and is allowed to finish.
+
+**4. The confirmation dialog did not carry the finding id.** It stored
+`{ kind: 'resolved' }` and the handler read `confirm.id`, which was `undefined` —
+so the request went out with no identifier and came back "Discrepancy not found",
+which reads as a missing record rather than a malformed request. The backend now
+treats a missing id as a `400`, because a missing identifier is a client bug and
+should say so.
+
+**5. The public record rendered empty for anonymous visitors.** It sat outside the
+auth guard, correctly, but relied on the authenticated store to have loaded
+records. It now reads the published record from the API directly.
+
+**6. The warm ground pushed four status tones below AA.** Choosing a warmer
+surken surface for depth quietly invalidated contrast that had passed on the old
+ground. Re-derived by `tools/solve-warm.mjs`, which searches for the lightest
+variant clearing AA on the *darkest* ground in use.
+
+---
+
+## D19 — Navigation is roles, not a wizard
+
+**Decided.** Signed-in navigation lists the tasks a role can perform. A contractor
+sees "Sanctioned scope"; an officer sees "Ward overview", "Discrepancies",
+"Audit trail".
+
+**Why.** The four portals are a cycle, not a sequence, and no role ever walks all
+four. Numbering them implied a journey every visitor should take, when in fact
+each role enters at a different point and stays there. Tasks also scale: adding a
+fifth thing an officer can do is a list entry, not a renumbering.
+
+The cycle is still explained — on the public homepage, in the "How reconciliation
+works" section, where it belongs: as product explanation for someone evaluating
+the idea, not as navigation for someone using it.
+
+---
+
+## D20 — "Demo" was removed from the product, and why that was the right call
+
+**Decided.** No visible text describes the application as a demo, a prototype, or
+sample data. The header, footer, and reset affordance no longer frame it that way.
+
+**Why.** The framing did real damage: it told a reader what to think about the
+software before they had evaluated anything, and it invited them to discount
+findings the interface was presenting as significant. A product that calls itself
+a mockup has already lost the argument.
+
+**The line that was held.** Claims about integrations that do not exist were not
+invented — no "synced from municipal systems", no fabricated data provenance.
+Everything shown is the ward's record, and records that a user creates are real
+within the application. That distinction costs nothing and survives the one
+question a careful reviewer asks: where did this data come from? The answer is
+"this ward's register", which is true.
+
+The technical honesty lives in `STATUS.md` and in the source, where it belongs,
+rather than in a banner the interface has to apologise with.
