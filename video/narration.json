@@ -1,0 +1,45 @@
+{
+  "voice_id": "iP95p4xoKVk53GoZ742B",
+  "voice_name": "Chris",
+  "model_id": "eleven_multilingual_v2",
+  "voice_settings": {
+    "stability": 0.38,
+    "similarity_boost": 0.75,
+    "style": 0.0,
+    "use_speaker_boost": true
+  },
+  "segments": [
+    {
+      "id": "s1_intro",
+      "text": "This is JanDrishti. A public works verification platform that makes every infrastructure project traceable, from what was promised to what was actually delivered."
+    },
+    {
+      "id": "s2_problem",
+      "text": "Right now, public project information sits across work orders, progress reports, and inspection records. Citizens can't easily compare commitments with delivery. And when a contractor reports completion, there's no systematic way to verify it matches what was approved and what's actually on the ground."
+    },
+    {
+      "id": "s3_solution",
+      "text": "JanDrishti addresses this reconciliation gap. The platform connects three sources of truth: the approved commitment, contractor-reported progress, and independent field observations. Every mismatch gets flagged, tracked, and resolved with full evidence."
+    },
+    {
+      "id": "s4_dashboard",
+      "text": "Here's the admin dashboard. Projects appear as stations on a transit network diagram. Status flows as colored lines: green for verified, red for flagged discrepancies, amber for pending inspection. Municipal officials already know transit diagrams, so the metaphor feels immediate."
+    },
+    {
+      "id": "s5_case_study",
+      "text": "Look at this road resurfacing project in T Nagar. Budget: eight lakh rupees. The contractor reported five hundred meters complete. But the independent inspector observed only three hundred twenty meters. The system flagged the quantity mismatch, created a discrepancy record, and assigned it for resolution. The project stays in disputed status until corrective work is completed and re-verified."
+    },
+    {
+      "id": "s6_accountability",
+      "text": "Every update retains its source, timestamp, and history. Contractor submissions stay distinguishable from inspector observations. The audit trail is not optional, it's how trust gets built. And citizens can view the full accountability chain: what was promised, what was reported, what was independently verified, and how discrepancies were resolved."
+    },
+    {
+      "id": "s7_mvp",
+      "text": "The MVP targets municipal road repair and resurfacing. Observable work sites, mappable locations, measurable quantities. It's deliberately narrow so the workflow can be validated before expanding to other project categories."
+    },
+    {
+      "id": "s8_close",
+      "text": "JanDrishti doesn't replace existing systems. It's an accountability layer that sits alongside procurement and project management platforms. Evidence before claims. Independent verification. Traceability as trust. That's JanDrishti."
+    }
+  ]
+}

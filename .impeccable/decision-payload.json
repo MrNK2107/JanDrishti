@@ -1,0 +1,61 @@
+{
+  "options": [
+    {
+      "id": "midnight-transit",
+      "kind": "challenger",
+      "catalogId": "wayfinding-cartography-signage-midnight-transit-diagram",
+      "label": "Midnight Transit Diagram",
+      "description": "Project accountability as a transit network where stations are projects, lines are status flows, and interchanges are discrepancies. Municipal officials know transit diagrams intimately.",
+      "thesis": "Organizes projects as a network diagram with status-colored lines, refusing flat tables that hide dependencies",
+      "palette": "Midnight-blue enamel (#0A1929), scarlet (#E63946) for flagged, cobalt (#2A9D8F) for verified, amber (#F4A261) for pending",
+      "materials": "Porcelain station markers, status lines at 45/90-degree angles, interchange alerts for discrepancies",
+      "firstViewport": "Left rail nav (260px), main splits: network diagram showing projects as stations with colored status lines (left, flex), live stats panel (right, 380px)",
+      "honestRisk": "The transit metaphor may feel abstract initially until users recognize the status flow pattern",
+      "html": ".impeccable/mocks/decision/midnight-transit.html",
+      "htmlFrame": "1440x900",
+      "case": "Municipal officials understand transit diagrams - they use them daily. The line/interchange model clarifies complex project dependencies better than tables."
+    },
+    {
+      "id": "cadastral-map",
+      "kind": "pick",
+      "label": "Survey Cadastral Map",
+      "description": "Official government survey map aesthetic with coordinate grids, zone overlays, boundary markers, and legend box. Familiar visual language from municipal planning.",
+      "thesis": "Projects mapped as surveyed zones with official cadastral precision, refusing generic pin-on-map interfaces",
+      "palette": "Survey paper (#F5F3ED), official green (#2C4A3A), zone colors (verified green, pending amber, flagged red), ruled grid lines",
+      "materials": "Topographic grid overlay, zone boundaries, coordinate boxes, scale bars, legend with status swatches",
+      "firstViewport": "Tool sidebar (72px), legend panel (280px), main map view with zone overlays and project markers, floating project detail card",
+      "honestRisk": "This is the most familiar government aesthetic - safe but predictable choice for municipal software",
+      "html": ".impeccable/mocks/decision/cadastral-map.html",
+      "htmlFrame": "1440x900"
+    },
+    {
+      "id": "split-flap",
+      "kind": "challenger",
+      "catalogId": "signals-instruments-split-flap-concourse",
+      "label": "Split-Flap Concourse Board",
+      "description": "Real-time project board styled as an airport/rail concourse split-flap display. Ruled rows, live cascading updates, status lamps.",
+      "thesis": "Live project monitoring as a split-flap departure board, refusing static lists that hide real-time changes",
+      "palette": "Matte black (#1C1C1C) with white letters, status lamps (green verified, amber pending, red flagged with glow)",
+      "materials": "Ruled tabular rows, condensed sans on black flaps, LED-style status indicators, brushed metal frame",
+      "firstViewport": "Full-width board with header (brand + time), ruled column headers, live project rows with status lamps, footer stats",
+      "honestRisk": "The split-flap aesthetic is striking but may feel more like a display than a working tool",
+      "html": ".impeccable/mocks/decision/split-flap.html",
+      "htmlFrame": "1440x900",
+      "case": "The ruled rows match register format perfectly, and real-time cascading updates fit live project monitoring."
+    }
+  ],
+  "buildPath": {
+    "value": "code",
+    "toggle": true
+  },
+  "reroll": {
+    "enabled": true,
+    "safer": "More conventional grounded candidates plus the category standard",
+    "bolder": "Foreign forms only, at full commitment"
+  },
+  "canon": {
+    "enabled": true,
+    "label": "Category Standard",
+    "description": "Clean municipal dashboard with sidebar navigation, data tables, map view, and card-based project details - the expected pattern"
+  }
+}

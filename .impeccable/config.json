@@ -1,0 +1,33 @@
+{
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/pages/AdminDashboard.jsx"
+        ],
+        "createdAt": "2026-11-06T15:31:31.231Z",
+        "reason": "Intentional transit station indicator - matches government rail/metro UI patterns"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-06T15:31:37.419Z",
+        "reason": "Intentional choice - Inter is appropriate for government platforms (used by gov.uk, clarity and accessibility prioritized)"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/cadastral-map.html"
+        ],
+        "createdAt": "2026-11-06T15:31:43.662Z",
+        "reason": "Intentional survey map aesthetic - mimics aged cadastral/topographic map paper"
+      }
+    ]
+  }
+}

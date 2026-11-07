@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JanDrishti - Survey Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #F5F3ED;
+  color: #1F2D1A;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  height: 900px;
+}
+.grid {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image:
+    repeating-linear-gradient(0deg, #D4CDC3 0px, #D4CDC3 1px, transparent 1px, transparent 20px),
+    repeating-linear-gradient(90deg, #D4CDC3 0px, #D4CDC3 1px, transparent 1px, transparent 20px);
+  pointer-events: none;
+  opacity: 0.4;
+}
+.shell { display: grid; grid-template-columns: 72px 280px 1fr; height: 900px; position: relative; }
+.toolbar {
+  background: #2C4A3A;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 12px;
+}
+.tool-btn {
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: 1px solid #445D4C;
+  border-radius: 4px;
+  color: #B8C9B5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+}
+.tool-btn.active {
+  background: #445D4C;
+  color: #E8EDD8;
+}
+.sidebar {
+  background: #E8EDD8;
+  border-right: 2px solid #2C4A3A;
+  padding: 24px;
+}
+.brand {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+.legend {
+  margin-top: 24px;
+}
+.legend-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+  color: #4A5D42;
+  font-weight: 600;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.legend-swatch {
+  width: 28px;
+  height: 18px;
+  border: 1px solid #2C4A3A;
+}
+.map-view {
+  position: relative;
+}
+.map-title {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(232,237,216,0.95);
+  border: 1px solid #2C4A3A;
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.north-arrow {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 64px;
+  border: 1px solid #2C4A3A;
+  background: rgba(232,237,216,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #C84339;
+}
+.zone {
+  position: absolute;
+  border: 2px solid #2C4A3A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+.zone-label {
+  background: rgba(255,255,255,0.9);
+  padding: 6px 10px;
+  border: 1px solid #2C4A3A;
+}
+.marker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #1F2D1A;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+.marker.verified { background: #6B9662; }
+.marker.pending { background: #D4A259; }
+.marker.flagged { background: #C84339; box-shadow: 0 0 0 5px rgba(200,67,57,0.25); }
+.project-card {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  width: 340px;
+  background: #fff;
+  border: 2px solid #2C4A3A;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.card-header {
+  background: #2C4A3A;
+  color: #E8EDD8;
+  padding: 14px 18px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.card-body {
+  padding: 18px;
+}
+.card-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.card-detail {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #4A5D42;
+}
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid #C84339;
+  background: rgba(200,67,57,0.1);
+  color: #C84339;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-top: 12px;
+}
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="shell">
+  <div class="toolbar">
+    <div class="tool-btn active">◈</div>
+    <div class="tool-btn">+</div>
+    <div class="tool-btn">⊞</div>
+    <div class="tool-btn">⊡</div>
+  </div>
+  <div class="sidebar">
+    <div class="brand">JanDrishti</div>
+    <div class="legend">
+      <div class="legend-title">Project Status</div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: #6B9662;"></div>
+        <div>Verified</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: #D4A259;"></div>
+        <div>Inspection Pending</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: #C84339;"></div>
+        <div>Discrepancy Flagged</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: #E8EDD8;"></div>
+        <div>Registered</div>
+      </div>
+    </div>
+  </div>
+  <div class="map-view">
+    <div class="map-title">WARD 12 – CHENNAI MUNICIPAL CORPORATION</div>
+    <div class="north-arrow">↑</div>
+
+    <div class="zone" style="left: 100px; top: 100px; width: 300px; height: 200px; background: rgba(107,150,98,0.1);">
+      <span class="zone-label">ZONE A</span>
+    </div>
+    <div class="zone" style="left: 420px; top: 100px; width: 280px; height: 250px; background: rgba(212,162,89,0.1);">
+      <span class="zone-label">ZONE B</span>
+    </div>
+    <div class="zone" style="left: 100px; top: 320px; width: 400px; height: 220px; background: rgba(200,67,57,0.1);">
+      <span class="zone-label">ZONE C</span>
+    </div>
+
+    <div class="marker verified" style="left: 250px; top: 200px;"></div>
+    <div class="marker verified" style="left: 180px; top: 160px;"></div>
+    <div class="marker pending" style="left: 550px; top: 220px;"></div>
+    <div class="marker pending" style="left: 500px; top: 180px;"></div>
+    <div class="marker flagged" style="left: 300px; top: 430px;"></div>
+    <div class="marker" style="left: 220px; top: 380px;"></div>
+    <div class="marker" style="left: 380px; top: 450px;"></div>
+
+    <div class="project-card">
+      <div class="card-header">JDT-2026-0143</div>
+      <div class="card-body">
+        <div class="card-title">Road Resurface 500m</div>
+        <div class="card-detail">Location: T Nagar Main Road</div>
+        <div class="card-detail">Approved: ₹8,00,000</div>
+        <div class="card-detail">Contractor: Reported 500m complete</div>
+        <div class="card-detail">Inspector: Observed 320m</div>
+        <div class="status-badge">⚠ Quantity Mismatch</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

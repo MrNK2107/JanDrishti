@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JanDrishti - Split Flap</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1C1C1C;
+  color: #F5F5F5;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  height: 900px;
+}
+.frame {
+  background: linear-gradient(135deg, #2A2A2A 0%, #1C1C1C 100%);
+  border: 8px solid #333;
+  height: 900px;
+}
+.header {
+  background: #0A0A0A;
+  border-bottom: 2px solid #444;
+  padding: 20px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brand {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.board {
+  padding: 32px;
+}
+.board-header {
+  display: grid;
+  grid-template-columns: 180px 280px 200px 160px 120px 1fr;
+  gap: 16px;
+  padding: 14px 18px;
+  background: #0A0A0A;
+  border: 1px solid #444;
+  margin-bottom: 2px;
+}
+.col-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #999;
+}
+.flap-row {
+  display: grid;
+  grid-template-columns: 180px 280px 200px 160px 120px 1fr;
+  gap: 16px;
+  margin-bottom: 2px;
+  background: #0A0A0A;
+  border: 1px solid #333;
+}
+.flap-cell {
+  padding: 18px;
+  font-size: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flap-cell.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.status-lamp {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #666;
+  flex-shrink: 0;
+}
+.status-lamp.verified { background: #4CAF50; }
+.status-lamp.pending { background: #FFA726; }
+.status-lamp.flagged { background: #EF5350; }
+.flap-row.flagged {
+  background: #1A0D0D;
+  border-color: #EF5350;
+}
+.footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0A0A0A;
+  border-top: 2px solid #444;
+  padding: 18px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.legend {
+  display: flex;
+  gap: 24px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="header">
+    <div class="brand">JANDRISHTI</div>
+  </div>
+
+  <div class="board">
+    <div class="board-header">
+      <div class="col-label">Project ID</div>
+      <div class="col-label">Location</div>
+      <div class="col-label">Work Description</div>
+      <div class="col-label">Budget</div>
+      <div class="col-label">Status</div>
+      <div class="col-label">Notes</div>
+    </div>
+
+    <div class="flap-row flagged">
+      <div class="flap-cell">JDT-2026-0143</div>
+      <div class="flap-cell">T Nagar Main Road</div>
+      <div class="flap-cell">Road Resurface 500m</div>
+      <div class="flap-cell">₹8,00,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp flagged"></div>
+        <span>QUANTITY MISMATCH</span>
+      </div>
+      <div class="flap-cell">Contractor 500m / Inspector 320m</div>
+    </div>
+
+    <div class="flap-row">
+      <div class="flap-cell">JDT-2026-0138</div>
+      <div class="flap-cell">Anna Nagar West Ext</div>
+      <div class="flap-cell">Storm Drain Repair</div>
+      <div class="flap-cell">₹3,50,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp verified"></div>
+        <span>VERIFIED</span>
+      </div>
+      <div class="flap-cell">Completed on schedule</div>
+    </div>
+
+    <div class="flap-row">
+      <div class="flap-cell">JDT-2026-0152</div>
+      <div class="flap-cell">Saidapet Bridge</div>
+      <div class="flap-cell">Pavement Work 200m</div>
+      <div class="flap-cell">₹5,20,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp pending"></div>
+        <span>INSPECTION DUE</span>
+      </div>
+      <div class="flap-cell">Milestone 2 reported</div>
+    </div>
+
+    <div class="flap-row">
+      <div class="flap-cell">JDT-2026-0129</div>
+      <div class="flap-cell">MG Road Junction</div>
+      <div class="flap-cell">Signal Post Install</div>
+      <div class="flap-cell">₹1,80,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp verified"></div>
+        <span>VERIFIED</span>
+      </div>
+      <div class="flap-cell">Equipment functional</div>
+    </div>
+
+    <div class="flap-row">
+      <div class="flap-cell">JDT-2026-0156</div>
+      <div class="flap-cell">Kodambakkam</div>
+      <div class="flap-cell">Street Light Repair</div>
+      <div class="flap-cell">₹2,40,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp pending"></div>
+        <span>IN PROGRESS</span>
+      </div>
+      <div class="flap-cell">60% complete</div>
+    </div>
+
+    <div class="flap-row flagged">
+      <div class="flap-cell">JDT-2026-0148</div>
+      <div class="flap-cell">Vadapalani Market</div>
+      <div class="flap-cell">Footpath Tiles</div>
+      <div class="flap-cell">₹4,60,000</div>
+      <div class="flap-cell status">
+        <div class="status-lamp flagged"></div>
+        <span>MISSING EVIDENCE</span>
+      </div>
+      <div class="flap-cell">Photos not submitted</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="legend">
+      <div class="legend-item">
+        <div class="status-lamp verified"></div>
+        <span>Verified</span>
+      </div>
+      <div class="legend-item">
+        <div class="status-lamp pending"></div>
+        <span>Pending</span>
+      </div>
+      <div class="legend-item">
+        <div class="status-lamp flagged"></div>
+        <span>Flagged</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

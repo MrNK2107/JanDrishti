@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JanDrishti - Transit Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0A1929;
+  color: #E8EDF2;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+  height: 900px;
+}
+.shell { display: grid; grid-template-columns: 260px 1fr; height: 900px; }
+.rail {
+  background: #07111C;
+  border-right: 1px solid #1A2B3D;
+  padding: 24px 0;
+}
+.brand {
+  padding: 0 20px 24px;
+  border-bottom: 1px solid #1A2B3D;
+  font-size: 18px;
+  font-weight: 600;
+}
+.nav { padding: 20px 0; }
+.nav-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 3px solid transparent;
+}
+.nav-item.active {
+  background: #0F1E2F;
+  border-left-color: #E63946;
+  color: #fff;
+}
+.main { display: grid; grid-template-rows: 64px 1fr; }
+.header {
+  background: #07111C;
+  border-bottom: 1px solid #1A2B3D;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-title { font-size: 20px; font-weight: 600; }
+.content {
+  padding: 32px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+}
+.map-area {
+  background: #0F1E2F;
+  border: 1px solid #1A2B3D;
+  border-radius: 8px;
+  padding: 32px;
+  position: relative;
+}
+.line-diagram {
+  position: relative;
+  height: 600px;
+  margin: 40px;
+}
+.station {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #E8EDF2;
+  border-radius: 50%;
+  border: 3px solid #0F1E2F;
+  cursor: pointer;
+}
+.station.verified { background: #2A9D8F; box-shadow: 0 0 0 4px rgba(42,157,143,0.25); }
+.station.flagged { background: #E63946; box-shadow: 0 0 0 4px rgba(230,57,70,0.25); }
+.station.pending { background: #F4A261; }
+.line {
+  position: absolute;
+  height: 5px;
+  background: #2A9D8F;
+}
+.line.vertical { width: 5px; }
+.line.scarlet { background: #E63946; }
+.line.amber { background: #F4A261; }
+.station-label {
+  position: absolute;
+  font-size: 12px;
+  white-space: nowrap;
+  font-weight: 500;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stat-card {
+  background: #0F1E2F;
+  border: 1px solid #1A2B3D;
+  border-radius: 8px;
+  padding: 24px;
+}
+.stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #748A9D;
+  margin-bottom: 12px;
+}
+.stat-value { font-size: 36px; font-weight: 600; }
+.project-list {
+  background: #0F1E2F;
+  border: 1px solid #1A2B3D;
+  border-radius: 8px;
+  padding: 20px;
+  flex: 1;
+}
+.list-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #748A9D;
+  margin-bottom: 16px;
+}
+.project-item {
+  padding: 14px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+.project-item.active { background: #07111C; border-left-color: #E63946; }
+.project-name { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.project-meta { font-size: 12px; color: #748A9D; }
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.status-dot.verified { background: #2A9D8F; }
+.status-dot.flagged { background: #E63946; }
+.status-dot.pending { background: #F4A261; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="rail">
+    <div class="brand">JanDrishti</div>
+    <div class="nav">
+      <div class="nav-item active"><span>●</span> Project Map</div>
+      <div class="nav-item"><span>■</span> Register Project</div>
+      <div class="nav-item"><span>▲</span> Inspections</div>
+      <div class="nav-item"><span>◆</span> Discrepancies</div>
+      <div class="nav-item"><span>○</span> Reports</div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="header">
+      <div class="header-title">Ward 12 – Public Works</div>
+    </div>
+    <div class="content">
+      <div class="map-area">
+        <div class="line-diagram">
+          <div class="line" style="left: 50px; top: 150px; width: 600px;"></div>
+          <div class="line scarlet vertical" style="left: 352px; top: 150px; height: 300px;"></div>
+          <div class="line amber" style="left: 200px; top: 300px; width: 212px; transform: rotate(45deg);"></div>
+
+          <div class="station verified" style="left: 48px; top: 148px;"><span class="station-label">MG Road</span></div>
+          <div class="station verified" style="left: 198px; top: 148px;"><span class="station-label">Anna Nagar</span></div>
+          <div class="station flagged" style="left: 348px; top: 148px;"><span class="station-label">T Nagar</span></div>
+          <div class="station pending" style="left: 498px; top: 148px;"><span class="station-label">Saidapet</span></div>
+          <div class="station" style="left: 648px; top: 148px;"><span class="station-label">Guindy</span></div>
+          <div class="station pending" style="left: 348px; top: 298px;"><span class="station-label">Kodambakkam</span></div>
+          <div class="station" style="left: 348px; top: 448px;"><span class="station-label">Vadapalani</span></div>
+          <div class="station verified" style="left: 300px; top: 380px;"><span class="station-label">Nungambakkam</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="stat-card">
+          <div class="stat-label">Active Projects</div>
+          <div class="stat-value">23</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Flagged</div>
+          <div class="stat-value" style="color: #E63946;">5</div>
+        </div>
+        <div class="project-list">
+          <div class="list-title">Recent Activity</div>
+          <div class="project-item active">
+            <div class="project-name"><span class="status-dot flagged"></span>Road Resurface 500m</div>
+            <div class="project-meta">T Nagar • Quantity mismatch</div>
+          </div>
+          <div class="project-item">
+            <div class="project-name"><span class="status-dot verified"></span>Drain Repair</div>
+            <div class="project-meta">Anna Nagar • Verified</div>
+          </div>
+          <div class="project-item">
+            <div class="project-name"><span class="status-dot pending"></span>Pavement Work</div>
+            <div class="project-meta">Saidapet • Inspection due</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
