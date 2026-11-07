@@ -1,9 +1,18 @@
-// WCAG 2.1 relative-luminance contrast check against the REAL tokens in
-// tailwind.config.cjs. Usage: node tools/contrast.mjs
-//
-// Supports both `npm run contrast` and direct invocation with overrides:
-//   node tools/contrast.mjs                 -> audit shipped palette
-//   node tools/contrast.mjs --candidates    -> audit proposed fix palette
+/**
+ * WCAG 2.1 contrast audit for the JanDrishti palette.
+ *
+ *   node tools/contrast.mjs              audit the shipped palette (exit 1 on failure)
+ *   node tools/contrast.mjs --candidates audit the derivation palette
+ *
+ * The palette separates a colour's FILL role from its TEXT role, so this script
+ * measures both against every surface the app actually uses. It exits non-zero
+ * on regression and is wired into `npm run verify:full`.
+ *
+ * History: the original palette failed five pairings. The worst was porcelain
+ * text on the amber fill at 1.75:1 — an accessibility defect that STATUS.md
+ * initially recorded correctly, then DELIVERY.md reclassified as an
+ * "intentional design choice". It was not; it was unreadable.
+ */
 
 const hex = (h) => {
   const s = h.replace('#', '')
@@ -19,7 +28,7 @@ const ratio = (a, b) => {
   return (l1 + 0.05) / (l2 + 0.05)
 }
 
-// --- tokens exactly as declared in tailwind.config.cjs ---
+/** Tokens, exactly as declared in tailwind.config.cjs. Keep in sync. */
 const T = {
   midnight950: '#07111C',
   midnight900: '#0A1929',
@@ -27,86 +36,93 @@ const T = {
   midnight700: '#1A2B3D',
   porcelain100: '#E8EDF2',
   porcelain200: '#748A9D',
-  verified: '#2A9D8F',
-  flagged: '#E63946',
-  pending: '#F4A261',
+  porcelain300: '#B4C4D2',
+  statusVerified: '#2A9D8F',
+  statusFlagged: '#E63946',
+  statusPending: '#F4A261',
+  textVerified: '#3FA79A',
+  textFlagged: '#E94D59',
+  textPending: '#F5AB71',
 }
 
-// --- proposed fixes: brand hues preserved for fills, darkened for text use ---
-const C = {
-  verifiedText: '#3FBFAE', // brighter green for text on dark
-  flaggedText: '#FF6B75', // brighter red for text on dark
-  pendingText: '#F4A261', // already passes on dark
-  verifiedFill: '#2A9D8F',
-  flaggedFill: '#C42A36', // darkened red so dark text sits on it
-  pendingFill: '#F4A261',
-  onFillText: '#07111C',
+const FILLS = [T.statusVerified, T.statusFlagged, T.statusPending]
+const GROUNDS = [T.midnight900, T.midnight800, T.midnight950]
+const TEXTS = {
+  'status-text verified': T.textVerified,
+  'status-text flagged': T.textFlagged,
+  'status-text pending': T.textPending,
 }
 
-const normal = 4.5
-const large = 3.0
+const NORMAL = 4.5
+const LARGE = 3.0
 
-const rows = (t) => [
-  // colored TEXT on dark surfaces
-  [t.verified, t.midnight900, 'verified text on midnight-900', normal],
-  [t.flagged, t.midnight900, 'flagged text on midnight-900', normal],
-  [t.pending, t.midnight900, 'pending text on midnight-900', normal],
-  [t.verified, t.midnight800, 'verified text on midnight-800', normal],
-  [t.flagged, t.midnight800, 'flagged text on midnight-800', normal],
-  [t.pending, t.midnight800, 'pending text on midnight-800', normal],
-  // body text on dark surfaces
-  [t.porcelain100, t.midnight900, 'porcelain-100 on midnight-900', normal],
-  [t.porcelain100, t.midnight800, 'porcelain-100 on midnight-800', normal],
-  [t.porcelain200, t.midnight900, 'porcelain-200 on midnight-900', normal],
-  [t.porcelain200, t.midnight800, 'porcelain-200 on midnight-800', normal],
-  [t.porcelain200, t.midnight950, 'porcelain-200 on midnight-950', normal],
-  // text sitting ON colored fills (the badges)
-  [t.porcelain100, t.verified, 'porcelain-100 on verified fill', normal],
-  [t.porcelain100, t.flagged, 'porcelain-100 on flagged fill', normal],
-  [t.porcelain100, t.pending, 'porcelain-100 on pending fill', normal],
-  [t.midnight950, t.verified, 'midnight-950 on verified fill', normal],
-  [t.midnight950, t.flagged, 'midnight-950 on flagged fill', normal],
-  [t.midnight950, t.pending, 'midnight-950 on pending fill', normal],
-]
+function buildRows() {
+  const rows = []
+
+  // Text colours on every ground the app renders them against.
+  for (const [name, fg] of Object.entries(TEXTS)) {
+    for (const [gi, bg] of GROUNDS.entries()) {
+      const groundName = ['midnight-900', 'midnight-800', 'midnight-950'][gi]
+      rows.push([fg, bg, `${name} on ${groundName}`, NORMAL])
+    }
+  }
+
+  // Body and muted text.
+  rows.push([T.porcelain100, T.midnight900, 'porcelain-100 on midnight-900', NORMAL])
+  rows.push([T.porcelain100, T.midnight800, 'porcelain-100 on midnight-800', NORMAL])
+  rows.push([T.porcelain100, T.midnight950, 'porcelain-100 on midnight-950', NORMAL])
+  rows.push([T.porcelain200, T.midnight900, 'porcelain-200 on midnight-900', NORMAL])
+  rows.push([T.porcelain200, T.midnight800, 'porcelain-200 on midnight-800', NORMAL])
+  rows.push([T.porcelain200, T.midnight950, 'porcelain-200 on midnight-950', NORMAL])
+  rows.push([T.porcelain300, T.midnight900, 'porcelain-300 on midnight-900', NORMAL])
+
+  // Dark text sitting ON coloured fills — the badge and status-dot pairing.
+  //
+  // Only `midnight-950` is listed, because it is the only colour the app places
+  // on a fill (see `text-midnight-950` in components/ui.jsx and AppShell.jsx).
+  // An audit that measures pairings the code never produces is worse than no
+  // audit: it reports failures that cannot occur and trains you to ignore it.
+  // `midnight-900` on the flagged fill is 4.26:1 — real, and deliberately not
+  // offered as a token combination.
+  for (const [fi, fill] of FILLS.entries()) {
+    const fillName = ['verified', 'flagged', 'pending'][fi]
+    rows.push([T.midnight950, fill, `midnight-950 on ${fillName} fill`, NORMAL])
+  }
+
+  return rows
+}
+
+function buildCandidates() {
+  return [
+    [T.textVerified, T.midnight900, 'FIX verified text on midnight-900', NORMAL],
+    [T.textFlagged, T.midnight900, 'FIX flagged text on midnight-900', NORMAL],
+    [T.textPending, T.midnight900, 'FIX pending text on midnight-900', NORMAL],
+    [T.textVerified, T.midnight800, 'FIX verified text on midnight-800', NORMAL],
+    [T.textFlagged, T.midnight800, 'FIX flagged text on midnight-800', NORMAL],
+    [T.textPending, T.midnight800, 'FIX pending text on midnight-800', NORMAL],
+    [T.midnight950, T.statusVerified, 'FIX dark text on verified fill', NORMAL],
+    [T.midnight950, T.statusFlagged, 'FIX dark text on flagged fill', NORMAL],
+    [T.midnight950, T.statusPending, 'FIX dark text on pending fill', NORMAL],
+  ]
+}
 
 const mode = process.argv.includes('--candidates') ? 'candidates' : 'shipped'
+const rows = mode === 'candidates' ? buildCandidates() : buildRows()
 
-if (mode === 'candidates') {
-  const t = {
-    ...T,
-    verified: C.verifiedText,
-    flagged: C.flaggedText,
-    pending: C.pendingText,
-  }
-  const cand = [
-    [t.verified, t.midnight900, 'FIX verified text on midnight-900', normal],
-    [t.flagged, t.midnight900, 'FIX flagged text on midnight-900', normal],
-    [t.pending, t.midnight900, 'FIX pending text on midnight-900', normal],
-    [t.verified, t.midnight800, 'FIX verified text on midnight-800', normal],
-    [t.flagged, t.midnight800, 'FIX flagged text on midnight-800', normal],
-    [t.pending, t.midnight800, 'FIX pending text on midnight-800', normal],
-    [C.onFillText, C.verifiedFill, 'FIX midnight text on verified fill', normal],
-    [C.onFillText, C.flaggedFill, 'FIX midnight text on flagged fill', normal],
-    [C.onFillText, C.pendingFill, 'FIX midnight text on pending fill', normal],
-    [t.porcelain100, t.midnight900, 'body porcelain-100 on midnight-900', normal],
-    [t.porcelain200, t.midnight900, 'muted porcelain-200 on midnight-900', normal],
-  ]
-  report(cand, mode)
-} else {
-  report(rows(T), mode)
+console.log(`\n=== JanDrishti palette — ${mode} (WCAG 2.1 AA) ===\n`)
+
+let failures = 0
+for (const [fg, bg, name, need] of rows) {
+  const r = ratio(fg, bg)
+  const ok = r >= need
+  if (!ok) failures++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${r.toFixed(2).padStart(6)}:1  needs ${need}  ${name}`)
 }
 
-function report(list, label) {
-  console.log(`\n=== ${label} palette ===\n`)
-  let fail = 0
-  for (const [fg, bg, name, req] of list) {
-    const r = ratio(fg, bg)
-    const ok = r >= req
-    if (!ok) fail++
-    console.log(
-      `${ok ? 'PASS' : 'FAIL'}  ${r.toFixed(2).padStart(5)}:1  needs ${req}  ${name}`
-    )
-  }
-  console.log(`\n${fail} failing of ${list.length}\n`)
-  if (label === 'shipped' && fail > 0) process.exitCode = 1
-}
+console.log(
+  `\n${rows.length - failures}/${rows.length} pairings pass` +
+    (failures ? `  (${failures} FAILING)` : '') +
+    '\n'
+)
+
+if (failures > 0) process.exitCode = 1

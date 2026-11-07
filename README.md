@@ -1,246 +1,246 @@
-# JanDrishti - Public Works Verification & Accountability Platform
+# JanDrishti
 
 **Connecting public project commitments to on-ground evidence.**
 
-## What is JanDrishti?
+A digital accountability platform for publicly funded infrastructure. JanDrishti
+reconciles three independent sources of truth and publishes where they disagree:
 
-JanDrishti is a digital accountability platform for tracking publicly funded infrastructure projects. It reconciles three sources of truth:
+1. **Approved commitment** — what was sanctioned and budgeted
+2. **Contractor report** — what the contractor claims was delivered
+3. **Independent observation** — what a field inspector actually measured
 
-1. **Approved Commitment** - What was officially approved and budgeted
-2. **Contractor Report** - What the contractor claims was delivered  
-3. **Independent Observation** - What field inspectors actually observe
+When the reported figure and the observed figure diverge beyond a published
+tolerance, a discrepancy is opened, assigned to a human, and its resolution is
+recorded in a public audit trail.
 
-When these don't match, the system flags discrepancies, assigns responsibility, tracks resolution, and preserves the complete evidence chain for citizen transparency.
-
-## Design Direction
-
-The UI merges two visual systems:
-- **Midnight Transit Diagram**: Projects organized as a network with status-colored lines (green=verified, red=flagged, amber=pending)
-- **Survey Cadastral Map**: Official government map aesthetic with coordinate grids and zone overlays
-
-This creates a familiar interface for municipal officials while clearly visualizing project dependencies and status flows.
-
-## Quick Start
-
-### Prerequisites
-- Node.js 18+
-- Python 3.8+ (for video generation)
-- ffmpeg (for audio duration checks)
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-The app will open at `http://localhost:3002`
-
-### Project Structure
-
-```
-JanDrishti/
-├── src/
-│   ├── pages/
-│   │   ├── AdminDashboard.jsx      # Main admin interface (COMPLETE)
-│   │   ├── ContractorPortal.jsx    # Contractor evidence submission
-│   │   ├── InspectorInterface.jsx  # Mobile field verification
-│   │   └── CitizenPortal.jsx       # Public transparency view
-│   ├── lib/
-│   │   └── supabase.js             # Supabase client config
-│   ├── App.jsx                     # Main router
-│   └── main.jsx                    # Entry point
-├── video/
-│   ├── narration.json              # Demo video script
-│   ├── tts.py                      # ElevenLabs voiceover generator
-│   └── audio/                      # Generated MP3 files (143s total)
-└── .impeccable/                    # Design artifacts
-    ├── surfaces/                   # Surface briefs
-    └── mocks/decision/             # UI mockup options
-```
-
-## Key Features Implemented
-
-### Admin Dashboard ✅
-- Transit network diagram showing projects as stations
-- Status-colored flow lines (verified/flagged/pending)
-- Cadastral grid overlay with coordinates
-- Live stats panel
-- Project detail cards showing discrepancy information
-- **Demo Case**: T Nagar road resurface - contractor reported 500m, inspector observed 320m (flagged)
-
-### Sample Data ✅
-- 3 projects with realistic data
-- Quantity mismatch scenario (500m vs 320m) 
-- Multiple status states demonstrated
-- Geographic zone organization
-
-### Design System ✅
-- Midnight blue palette (#0A1929 ground)
-- Status colors: verified (#2A9D8F), flagged (#E63946), pending (#F4A261)
-- Transit-style station markers
-- Cadastral coordinate system overlay
-- Tailwind CSS with custom tokens
-
-### Demo Video Assets ✅
-- Professional narration script (8 segments, ~143 seconds)
-- ElevenLabs voiceover generated (Chris voice, multilingual v2)
-- Audio segments stored in `video/audio/`
-
-## Demo Video Production
-
-### Voiceover Generation ✅ COMPLETE
-
-```bash
-cd video
-python tts.py  # Generates all 8 segments (~143s total)
-```
-
-Audio segments are cached - only regenerates if text/voice settings change.
-
-### Recording the Demo (Manual Step Required)
-
-1. **Start the app**: `npm run dev` → Opens at http://localhost:3002
-2. **Record screen**:
-   - Use OBS Studio, ShareX, or Windows Game Bar
-   - Record at 1920x1080, 30fps
-   - Capture these scenes:
-     - Full dashboard view showing transit diagram
-     - Hover over T Nagar station (flagged project)
-     - Click to show discrepancy details
-     - Show stats panel
-     - Demonstrate coordinate grid overlay
-3. **Assemble final video**:
-   ```bash
-   # Use ffmpeg or video editor to:
-   # - Trim/sequence screen recordings
-   # - Overlay voiceover segments in order (s1_intro → s8_close)
-   # - Add title card: "JanDrishti - Public Works Accountability"
-   # - Export as MP4 (H.264, 1920x1080)
-   ```
-
-## Architecture
-
-### Frontend
-- **React 19** with Vite
-- **Tailwind CSS** for styling
-- **React Router** for navigation
-
-### Backend (Configured, Not Implemented)
-- **Supabase** for:
-  - PostgreSQL + PostGIS (geospatial queries)
-  - Authentication (role-based: Admin/Contractor/Inspector/Citizen)
-  - File storage (evidence photos/videos)
-  - Row Level Security for data access control
-
-### Future Implementation
-- Database schema (Projects, Milestones, Evidence, Inspections, Discrepancies)
-- Evidence reconciliation engine (automated mismatch detection)
-- File hashing and duplicate detection
-- Inspector mobile interface (offline-capable)
-- Contractor portal (milestone submission)
-- Citizen portal (public transparency)
-
-## Product Principles
-
-1. **Evidence before claims**: Completion must be supported by proof
-2. **Independent verification**: Contractor and inspector data stay distinguishable  
-3. **Traceability**: Full audit trail with timestamps and actors
-4. **Explainability**: Show what was expected, submitted, observed, and why it was flagged
-5. **Human accountability**: Software flags, humans decide
-
-## MVP Scope
-
-**Target**: Municipal road repair and resurfacing in one ward
-
-**Why**: Observable worksites, mappable locations, measurable quantities, understandable before/after evidence.
-
-**What's Included**:
-- Project registry with geospatial data
-- Milestone tracking
-- Evidence submission workflow
-- Independent inspection interface
-- Automated reconciliation alerts
-- Discrepancy resolution tracking
-- Citizen transparency portal
-
-**Explicitly Out of Scope**:
-- Replacing GeM, CPGRAMS, or existing procurement systems
-- Payment authorization
-- Automated fraud determination
-- Facial recognition or Aadhaar processing
-
-## Development Status
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Design System | ✅ Complete | Midnight Transit + Cadastral Map merged |
-| Admin Dashboard | ✅ Complete | Interactive transit diagram, sample data |
-| Database Schema | ⏸️ Designed | Documented in PRODUCT.md |
-| Contractor Portal | 📋 Scaffolded | Basic structure, needs implementation |
-| Inspector Interface | 📋 Scaffolded | Needs mobile-friendly forms + GPS |
-| Citizen Portal | 📋 Scaffolded | Needs public data filtering |
-| Evidence Engine | 📋 Planned | File hashing, duplicate detection |
-| Reconciliation | 📋 Planned | Automated mismatch detection |
-| Demo Video Script | ✅ Complete | 8 segments, professional narration |
-| Voiceover Audio | ✅ Complete | ElevenLabs generated, 143s |
-| Screen Recording | ⏸️ Manual | Requires user to capture app demo |
-| Final Video | ⏸️ Pending | Assembly step |
-
-## Design Artifacts
-
-### UI Mockups Created
-Three design directions were presented:
-1. **Midnight Transit Diagram** ✅ CHOSEN - Project network with status lines
-2. **Survey Cadastral Map** - Official government survey aesthetic  
-3. **Split-Flap Concourse** - Airport-style live project board
-
-Final design merged elements from options 1 & 2.
-
-### Design Files
-- Mockups: `.impeccable/mocks/decision/*.html`
-- Surface brief: `.impeccable/surfaces/public-index-html.md`
-- Product context: `PRODUCT.md`
-
-## Testing
-
-```bash
-npm test  # Vitest (configured, tests pending)
-```
-
-## Environment Setup
-
-Create `.env` with your Supabase credentials:
-
-```bash
-cp .env.example .env
-# Edit .env with your Supabase URL and anon key
-```
-
-## Contributing
-
-This is a National Student Ideation Challenge concept submission (Track A - Product/Technology, Theme: Surakshit Bharat - Digital Public Infrastructure).
-
-Current stage: **Prototype with demo video**
-
-Next steps for production:
-1. Complete Supabase backend implementation
-2. Implement all 4 user interfaces
-3. Build evidence reconciliation engine
-4. Field test with actual municipal project data
-5. Pilot with one municipal ward
-
-## License
-
-ISC
-
-## Contact
-
-For inquiries about deployment or collaboration: [Add contact info]
+Submission for the **National Student Ideation Challenge** — Track A
+(Product/Technology), Theme: *Surakshit Bharat — Digital Public Infrastructure*.
 
 ---
 
-**"JanDrishti connects public project promises to on-ground evidence, helping authorities and citizens verify whether taxpayer-funded infrastructure was actually delivered."**
+## Status at a glance
+
+| Component | State |
+|---|---|
+| Ward Admin portal | Working — map, discrepancy queue, audit trail |
+| Contractor portal | Working — claim submission against sanctioned scope |
+| Inspector interface | Working — observation capture with immediate reconciliation |
+| Citizen portal | Working — read-only public record |
+| Reconciliation engine | Working — 3 rules, pure and fully tested |
+| Unit tests | 68 passing |
+| Browser verification | 24 checks passing, including a live WCAG audit |
+| Accessibility | 19/19 palette pairings meet WCAG AA |
+| Production build | Clean (~97 kB gzipped) |
+| **Backend** | **Not implemented — see below** |
+| **Demo video** | **Not made — see `VIDEO_SHOTLIST.md`** |
+
+Two things this project does *not* have, stated up front because the previous
+documentation was not honest about them: there is **no database or
+authentication**, and there is **no assembled video**. Everything else listed
+above is implemented and verified.
+
+---
+
+## Quick start
+
+Requires Node 18+.
+
+```bash
+npm install
+npm run dev          # http://localhost:3002
+```
+
+Other scripts:
+
+```bash
+npm test             # 68 unit tests (domain + store + components)
+npm run contrast     # WCAG audit of the palette; exits 1 on regression
+npm run build        # production build
+npm run verify       # browser verification (needs dev server running)
+npm run verify:full  # tests + contrast + build + browser verification
+```
+
+`npm run verify` drives a real Chrome through the full accountability loop and
+writes screenshots to `screenshots/`. It uses a browser already installed on the
+machine rather than downloading one.
+
+---
+
+## The reconciliation model
+
+This is the core of the product, and it lives in one pure module:
+[`src/domain/reconcile.js`](src/domain/reconcile.js). It imports no framework and
+performs no I/O.
+
+**Tolerances** are policy, not physics, so they are named, exported, and shown in
+the UI. A reviewer can see the rule that flagged them:
+
+| Rule | Tolerance | What it catches |
+|---|---|---|
+| Reported vs approved | ±2% | Overclaiming beyond sanctioned scope |
+| Observed vs reported | ±5% | The claim not matching physical reality |
+| Duplicate evidence | exact hash match | Same photograph submitted as two observations |
+
+A shortfall beyond 25% of the claim is graded **high severity**.
+
+Three decisions inside this module are worth knowing, because each fixes a bug
+the tests caught:
+
+- **A missing observation is only reportable once something has been claimed.**
+  Flagging untouched milestones buried real findings in noise.
+- **A claim with no observation is `awaiting inspection`, not `flagged`.**
+  Insufficient evidence is not a finding of wrongdoing. If filing a claim
+  immediately flagged it, the flag would mean nothing.
+- **A resolved discrepancy clears the flag.** Otherwise resolution was
+  decorative and a finding could never be closed.
+
+The full reasoning is in [`DECISIONS.md`](DECISIONS.md).
+
+---
+
+## Architecture
+
+```
+src/
+├── domain/            # framework-free, pure
+│   ├── reconcile.js       reconciliation rules and formatting
+│   ├── seed.js            three seeded projects, one per lifecycle state
+│   └── selectors.js       raw records -> view-ready values
+├── store/
+│   └── StoreProvider.jsx  reducer, actions, sessionStorage persistence
+├── components/
+│   ├── ui.jsx             primitives; owns every status colour
+│   ├── AppShell.jsx       shared chrome across the four portals
+│   ├── TransitDiagram.jsx cadastral grid + transit network
+│   ├── ProjectStation.jsx one project as a station
+│   └── DiscrepancyQueue.jsx the review surface
+└── pages/             # the four portals
+```
+
+**Derived values are never stored.** Milestone and project status are computed
+from the evidence on every render. Keeping a status field alongside the evidence
+would create two sources of truth that can disagree — the exact failure this
+product exists to detect.
+
+**The four portals are one product.** They share one store and are one click
+apart, because the accountability loop is only visible when you move between
+them.
+
+---
+
+## Why there is no backend
+
+The Supabase client remains in [`src/lib/supabase.js`](src/lib/supabase.js) and is
+unused by the demo path. This is a deliberate trade-off, not an omission.
+
+A competition demo runs once, on hardware you do not fully control, often on
+someone else's network. A live database adds signup failure, expired keys, CORS,
+and cold-start latency as possible causes of a demo that does not work. The
+reconciliation logic — the part that carries the product's claim — is fully
+exercised without any of that risk.
+
+The cost is real and worth stating: **this is a demonstration, not a deployed
+system.** There is no persistence beyond the browser session, no authentication,
+no role enforcement, and no file storage. The Citizen portal is read-only
+because it dispatches no actions, which is a structural property rather than an
+enforced permission.
+
+### Seeded state
+
+Three projects, one per lifecycle state, so every branch of the logic is
+visible without any setup:
+
+| Project | State | What it demonstrates |
+|---|---|---|
+| T Nagar Main Road Resurfacing | **Flagged** | Claimed 500 m, observed 320 m — the case study |
+| Anna Nagar West Storm Drain | **Verified** | Claim and observation agree within tolerance |
+| Saidapet Bridge Pavement | **Awaiting inspection** | Claim on file, no observation yet |
+
+Saidapet is the entry point for the live walkthrough: record an observation
+against it and watch the system decide, rather than being shown a verdict.
+
+State persists to `sessionStorage`, so a reload mid-walkthrough does not discard
+your work. Use **Reset demo data** in the sidebar to return to seed.
+
+---
+
+## Accessibility
+
+The original palette failed five WCAG AA pairings. The worst was porcelain text
+on the amber fill at **1.75:1**, against a 4.5:1 requirement. An early status
+report recorded this correctly; a later delivery summary reclassified it as an
+"intentional design choice". It was not — it was unreadable.
+
+The palette now separates a colour's **fill** role from its **text** role. The
+brand hues are unchanged as fills; text variants are each brand hue mixed 10%
+toward white, the minimum shift that clears AA on every ground. Those values were
+derived by [`tools/pick-palette.mjs`](tools/pick-palette.mjs), not chosen by eye.
+
+All 19 pairings the app actually renders now pass, verified two ways: statically
+via `npm run contrast`, and against the live DOM by `npm run verify`.
+
+Status is also never conveyed by colour alone — every status surface carries a
+label and a distinct glyph, so the interface survives both colourblindness and a
+greyscale screenshot.
+
+---
+
+## Testing
+
+**68 unit tests** cover the reconciliation rules, the reducer, the derived
+selectors, and the station component. They run in under a second.
+
+**24 browser checks** ([`tools/verify-browser.mjs`](tools/verify-browser.mjs))
+cover what unit tests cannot: that all four routes render without console
+errors, that the palette passes AA *in rendered pixels*, and that the
+accountability loop closes end to end —
+
+> contractor files a claim → inspector records a conflicting observation →
+> a discrepancy opens automatically → a Ward Officer resolves it with a written
+> finding → the disposition appears in the citizen record.
+
+Two bugs were found by this browser walkthrough rather than by unit tests, both
+recorded in [`DECISIONS.md`](DECISIONS.md): a memory-only store that silently
+discarded all work on any hard navigation, and a missing favicon.
+
+---
+
+## Scope
+
+**Target:** municipal road repair and resurfacing in one ward. Chosen because
+worksites are observable, locations are mappable, quantities are measurable, and
+before/after evidence is understandable.
+
+**Explicitly out of scope:** replacing GeM, CPGRAMS, or existing procurement
+systems; payment authorisation; automated fraud determination; facial
+recognition or Aadhaar processing.
+
+**Product principles**
+
+1. Evidence before claims — completion must be supported by proof
+2. Independent verification — contractor and inspector data stay distinguishable
+3. Traceability — full audit trail with timestamps and actors
+4. Explainability — show what was expected, submitted, observed, and why it was flagged
+5. Human accountability — software flags, humans decide
+
+---
+
+## Roadmap
+
+1. **Backend** — Supabase Postgres + PostGIS, row-level security per role,
+   storage for evidence, real authentication
+2. **Evidence integrity** — real content hashing on upload, perceptual image
+   similarity to catch resubmitted photographs
+3. **Inspector offline mode** — capture at sites with no connectivity, sync later
+4. **Field pilot** — 5–10 real projects in one ward, read-only integration with
+   existing municipal records
+
+---
+
+## Licence
+
+ISC.
+
+> JanDrishti connects public project promises to on-ground evidence, helping
+> authorities and citizens verify whether taxpayer-funded infrastructure was
+> actually delivered.

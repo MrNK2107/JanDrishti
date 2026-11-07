@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JanDrishti — Demo Storyboard</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230A1929'/%3E%3Cpath d='M10 40H54' stroke='%232A9D8F' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%232A9D8F'/%3E%3Ccircle cx='32' cy='40' r='5' fill='%23E63946'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%23F4A261'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --ground: #0a1929;
+        --panel: #0f1e2f;
+        --border: #1a2b3d;
+        --text: #e8edf2;
+        --muted: #748a9d;
+        --verified: #3fa79a;
+        --flagged: #e94d59;
+        --pending: #f5ab71;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--text);
+        font: 15px/1.6 "Inter", "Segoe UI", system-ui, sans-serif;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: 100vh;
+      }
+
+      /* --- Rail --- */
+      aside { background: #07111c; border-right: 1px solid var(--border); padding: 20px; }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      .sub { font-size: 11px; color: var(--muted); margin-bottom: 20px; }
+      .seg {
+        display: block; width: 100%; text-align: left; cursor: pointer;
+        background: transparent; border: 1px solid transparent; border-left: 3px solid transparent;
+        color: var(--muted); padding: 9px 10px; border-radius: 4px; font: inherit; font-size: 12px;
+      }
+      .seg:hover { background: var(--panel); color: var(--text); }
+      .seg.active { background: var(--panel); border-color: var(--border); border-left-color: var(--flagged); color: var(--text); }
+      .seg .n { font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+      .seg .d { float: right; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--muted); }
+
+      /* --- Stage --- */
+      main { padding: 28px 34px; max-width: 940px; }
+      .clock {
+        font-family: ui-monospace, Consolas, monospace; font-size: 46px; font-weight: 600;
+        letter-spacing: -1px; line-height: 1;
+      }
+      .clock small { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 10px; }
+      .bar { height: 4px; background: var(--panel); border-radius: 4px; margin: 16px 0 26px; overflow: hidden; border: 1px solid var(--border); }
+      .bar > i { display: block; height: 100%; background: var(--verified); width: 0; transition: width 120ms linear; }
+
+      .shot-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .shot-head h2 { font-size: 20px; margin: 0; }
+      .tag { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border: 1px solid var(--border); border-radius: 3px; padding: 3px 7px; color: var(--muted); }
+
+      .action { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--pending); border-radius: 0 6px 6px 0; padding: 16px 18px; margin: 18px 0; }
+      .action h3 { margin: 0 0 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+      .action ol { margin: 0; padding-left: 20px; }
+      .action li { margin: 5px 0; }
+      .action p { margin: 6px 0; }
+
+      .script { font-size: 17px; line-height: 1.8; color: var(--text); border-left: 2px solid var(--border); padding-left: 16px; margin: 22px 0; }
+      .script em { color: var(--muted); font-style: normal; }
+
+      .controls { display: flex; gap: 10px; align-items: center; margin-top: 26px; flex-wrap: wrap; padding-top: 20px; border-top: 1px solid var(--border); }
+      button.ctl { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; font-size: 13px; }
+      button.ctl:hover { border-color: var(--verified); }
+      button.ctl.primary { background: var(--verified); color: #07111c; font-weight: 600; border-color: transparent; }
+      button.ctl:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      .note { font-size: 12px; color: var(--muted); margin-top: 18px; line-height: 1.7; }
+      .note strong { color: var(--text); font-weight: 600; }
+      .warn { border-left: 3px solid var(--flagged); padding-left: 12px; }
+      audio { width: 100%; margin-top: 10px; }
+      .hint { font-size: 12px; color: var(--muted); }
+      kbd { background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: ui-monospace, monospace; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <h1>Demo Storyboard</h1>
+      <div class="sub">2:13 total · 8 segments</div>
+      <div id="seglist"></div>
+      <div class="note" style="margin-top: 22px">
+        <strong>Before recording</strong><br />
+        Run <code>npm run dev</code>, open
+        <code>http://localhost:3002</code>, click
+        <strong>Reset demo data</strong>, and set the window to 1920×1080.
+      </div>
+    </aside>
+
+    <main>
+      <div class="clock"><span id="elapsed">0:00.0</span><small id="total">of 2:13.3</small></div>
+      <div class="bar"><i id="prog"></i></div>
+
+      <div class="shot-head">
+        <h2 id="title">—</h2>
+        <span class="tag" id="route"></span>
+        <span class="tag" id="dur"></span>
+      </div>
+
+      <div class="script" id="script"></div>
+
+      <div class="action">
+        <h3>Do this</h3>
+        <div id="action"></div>
+      </div>
+
+      <div class="note warn" id="aside"></div>
+
+      <audio id="player" preload="auto"></audio>
+
+      <div class="controls">
+        <button class="ctl primary" id="play">▶ Play segment</button>
+        <button class="ctl" id="next">Next shot</button>
+        <button class="ctl" id="prev">Previous</button>
+        <span class="hint">or press <kbd>Space</kbd> to play, <kbd>→</kbd> / <kbd>←</kbd> to move</span>
+      </div>
+
+      <div class="note">
+        The audio in this page is the real voiceover from
+        <code>video/audio/</code>. Play a segment and the timer counts it down —
+        do not record from this page. Record the app window, and use this to know
+        what should be on screen.
+      </div>
+    </main>
+
+    <script type="module">
+      // Segment durations measured from the real MP3s with ffprobe.
+      const SHOTS = [
+        {
+          id: 's1_intro', file: 'audio/s1_intro.mp3', dur: 8.08,
+          title: 'Title card', route: 'static card',
+          script: 'This is JanDrishti. A public works verification platform that makes every infrastructure project traceable, from what was promised to what was actually delivered.',
+          action: '<p>Static card — no UI yet. Wordmark on the dark ground, with the line <em>Public Works Verification &amp; Accountability</em>. Fade in over 0.5s and hold still.</p>',
+          aside: '',
+        },
+        {
+          id: 's2_problem', file: 'audio/s2_problem.mp3', dur: 18.76,
+          title: 'The gap, in three numbers', route: 'Citizen portal',
+          script: 'Right now, public project information sits across work orders, progress reports, and inspection records. Citizens can’t easily compare commitments with delivery. And when a contractor reports completion, there’s no systematic way to verify it matches what was approved and what’s actually on the ground.',
+          action: `
+            <ol>
+              <li>Open the <strong>Citizen</strong> portal and expand <strong>T Nagar Main Road Resurfacing</strong>.</li>
+              <li>The three numbered cards — <em>Sanctioned</em>, <em>Contractor reported</em>, <em>Independently observed</em> — are the whole shot. Do not scroll past them.</li>
+              <li>At “can’t easily compare”, drift the cursor slowly across the three cards.</li>
+              <li>Scroll gently back to the summary panel for the closing line.</li>
+            </ol>`,
+          aside: 'This segment describes a problem the next shot solves. Keep it slow and let the three figures sit on screen.',
+        },
+        {
+          id: 's3_solution', file: 'audio/s3_solution.mp3', dur: 18.16,
+          title: 'Reconciliation, live', route: 'Inspector portal',
+          script: 'JanDrishti addresses this reconciliation gap. The platform connects three sources of truth: the approved commitment, contractor-reported progress, and independent field observations. Every mismatch gets flagged, tracked, and resolved with full evidence.',
+          action: `
+            <ol>
+              <li>Open the <strong>Inspector</strong> portal and select <strong>Saidapet Bridge Pavement Work</strong>.</li>
+              <li>Point at <em>Contractor claims</em>: <strong>200 m</strong>.</li>
+              <li>Type <code>90</code> into the observed field — type it, do not paste.</li>
+              <li>Click <strong>Submit observation and reconcile</strong>.</li>
+              <li>The verdict panel appears at <strong>−55.0%</strong> with a flag and “A discrepancy has been opened and referred to the Ward Officer.” Hold on it.</li>
+            </ol>`,
+          aside: 'This is the strongest 18 seconds you have: the system decides, rather than displaying a stored verdict. Consider adding a ~12s ninth narration segment describing it — see VIDEO_SHOTLIST.md.',
+        },
+        {
+          id: 's4_dashboard', file: 'audio/s4_dashboard.mp3', dur: 18.34,
+          title: 'The ward map', route: 'Ward Admin → Ward Map',
+          script: 'Here’s the admin dashboard. Projects appear as stations on a transit network diagram. Status flows as colored lines: green for verified, red for flagged discrepancies, amber for pending inspection. Municipal officials already know transit diagrams, so the metaphor feels immediate.',
+          action: `
+            <ol>
+              <li>Open on the full map. Do not click for the first four seconds.</li>
+              <li>At “green for verified” → trace the green line in the legend.</li>
+              <li>At “red for flagged” → hover the <strong>T Nagar</strong> station so its label appears.</li>
+              <li>At “amber for pending” → hover <strong>Saidapet</strong>. It now reads <em>flagged</em> too, because of the previous shot. That is correct — it shows the map reacting.</li>
+              <li>Close on a slow pan across the cadastral grid, coordinate readout, and north arrow.</li>
+            </ol>`,
+          aside: '',
+        },
+        {
+          id: 's5_case_study', file: 'audio/s5_case_study.mp3', dur: 27.59,
+          title: 'T Nagar — 500 vs 320', route: 'Ward Admin → Ward Map → T Nagar',
+          script: 'Look at this road resurfacing project in T Nagar. Budget: eight lakh rupees. The contractor reported five hundred meters complete. But the independent inspector observed only three hundred twenty meters. The system flagged the quantity mismatch, created a discrepancy record, and assigned it for resolution. The project stays in disputed status until corrective work is completed and re-verified.',
+          action: `
+            <ol>
+              <li>“Budget: eight lakh rupees” → the <strong>₹8,00,000</strong> field.</li>
+              <li>“reported five hundred” → the <strong>Reported 500 m</strong> cell.</li>
+              <li>“observed only three hundred twenty” → the <strong>Observed 320 m</strong> cell, tinted red.</li>
+              <li>“flagged the quantity mismatch” → scroll to <strong>Reconciliation</strong>. The failing check carries its arithmetic. This is the money shot: the system shows <em>why</em>, not just <em>that</em>.</li>
+              <li>“created a discrepancy record” → the <strong>Findings on record</strong> list showing <code>DSC-0001</code>.</li>
+              <li>“stays in disputed status” → the status badge reading <strong>Flagged</strong>.</li>
+            </ol>`,
+          aside: 'Narration says “assigned it for resolution”, which implies named assignment. The system refers findings to the Ward Officer queue but does not support assigning a person. Accept the imprecision or re-record that clause.',
+        },
+        {
+          id: 's6_accountability', file: 'audio/s6_accountability.mp3', dur: 21.59,
+          title: 'Evidence chain and the public view', route: 'Audit Trail → Citizen',
+          script: 'Every update retains its source, timestamp, and history. Contractor submissions stay distinguishable from inspector observations. The audit trail is not optional, it’s how trust gets built. And citizens can view the full accountability chain: what was promised, what was reported, what was independently verified, and how discrepancies were resolved.',
+          action: `
+            <ol>
+              <li>Open <strong>Audit Trail</strong>. Scroll slowly — sources, roles, timestamps, append-only numbering.</li>
+              <li>At “And citizens can view” (~01:46), cut to the <strong>Citizen</strong> portal and expand <strong>Saidapet Bridge Pavement Work</strong> — the one you filed.</li>
+              <li>Show its <strong>Discrepancy record</strong>, including the <em>Disposition</em> line.</li>
+            </ol>`,
+          aside: 'End on the citizen disposition. A finding raised by an inspector, closed by an officer, and published to the public in under two minutes — that is the whole argument.',
+        },
+        {
+          id: 's7_mvp', file: 'audio/s7_mvp.mp3', dur: 13.79,
+          title: 'Scope', route: 'Ward Admin → Ward Map',
+          script: 'The MVP targets municipal road repair and resurfacing. Observable work sites, mappable locations, measurable quantities. It’s deliberately narrow so the workflow can be validated before expanding to other project categories.',
+          action: `
+            <ol>
+              <li>Return to the <strong>Ward Map</strong>. No interaction.</li>
+              <li>Hold on the wide shot of the ward.</li>
+              <li>At “deliberately narrow”, scroll to the <strong>Ward register</strong> below the map and stop.</li>
+            </ol>`,
+          aside: 'Do not open other portals. This segment is about restraint.',
+        },
+        {
+          id: 's8_close', file: 'audio/s8_close.mp3', dur: 16.95,
+          title: 'Closing card', route: 'static card',
+          script: 'JanDrishti doesn’t replace existing systems. It’s an accountability layer that sits alongside procurement and project management platforms. Evidence before claims. Independent verification. Traceability as trust. That’s JanDrishti.',
+          action: '<p>Closing card: wordmark, with the three lines appearing as the narrator says them. End on “That’s JanDrishti.” Hold one second, then fade out.</p>',
+          aside: '',
+        },
+      ]
+
+      const fmt = (s) => {
+        const m = Math.floor(s / 60)
+        const r = (s % 60).toFixed(1).padStart(4, '0')
+        return `${m}:${r}`
+      }
+
+      // Sum the per-segment durations rather than hardcoding a total, so the
+      // figure cannot drift if a segment is regenerated. The true total is
+      // 143.26s. Note s1_intro is 8.08s — the inherited docs listed it as
+      // 18.08s, a per-segment error that happened not to change the total
+      // because the other seven were correct.
+      const TOTAL = SHOTS.reduce((a, s) => a + s.dur, 0)
+
+      const list = document.getElementById('seglist')
+      const player = document.getElementById('player')
+      let current = 0
+      let raf = null
+
+      SHOTS.forEach((s, i) => {
+        const b = document.createElement('button')
+        b.className = 'seg'
+        b.innerHTML = `<span class="d">${s.dur.toFixed(1)}s</span><span class="n">${String(i + 1).padStart(2, '0')}</span> ${s.title}`
+        b.onclick = () => select(i)
+        list.appendChild(b)
+      })
+
+      document.getElementById('total').textContent = 'of ' + fmt(TOTAL)
+
+      function select(i) {
+        current = Math.max(0, Math.min(SHOTS.length - 1, i))
+        const s = SHOTS[current]
+        document.getElementById('title').textContent = s.title
+        document.getElementById('route').textContent = s.route
+        document.getElementById('dur').textContent = s.dur.toFixed(1) + 's'
+        document.getElementById('script').textContent = s.script
+        document.getElementById('action').innerHTML = s.action
+        const aside = document.getElementById('aside')
+        aside.innerHTML = s.aside || ''
+        aside.style.display = s.aside ? '' : 'none'
+        ;[...list.children].forEach((c, n) => c.classList.toggle('active', n === current))
+        player.src = s.file
+        player.load()
+        document.getElementById('elapsed').textContent = '0:00.0'
+        document.getElementById('prog').style.width = '0%'
+      }
+
+      function tick() {
+        const s = SHOTS[current]
+        const t = Math.min(player.currentTime, s.dur)
+        const pct = s.dur ? (t / s.dur) * 100 : 0
+        document.getElementById('prog').style.width = pct + '%'
+        document.getElementById('elapsed').textContent =
+          fmt(t) + ' / ' + s.dur.toFixed(1) + 's'
+        if (!player.paused && !player.ended) raf = requestAnimationFrame(tick)
+      }
+
+      player.addEventListener('play', () => {
+        cancelAnimationFrame(raf)
+        raf = requestAnimationFrame(tick)
+      })
+      player.addEventListener('ended', () => {
+        cancelAnimationFrame(raf)
+        document.getElementById('prog').style.width = '100%'
+        if (current < SHOTS.length - 1) {
+          setTimeout(() => {
+            select(current + 1)
+          }, 300)
+        }
+      })
+
+      document.getElementById('play').onclick = () => {
+        if (player.paused) player.play()
+        else player.pause()
+      }
+      player.addEventListener('pause', () => {
+        document.getElementById('play').textContent = '▶ Play segment'
+        cancelAnimationFrame(raf)
+      })
+      player.addEventListener('play', () => {
+        document.getElementById('play').textContent = '⏸ Pause'
+      })
+
+      document.getElementById('next').onclick = () => select(current + 1)
+      document.getElementById('prev').onclick = () => select(current - 1)
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault()
+          if (player.paused) player.play()
+          else player.pause()
+        }
+        if (e.code === 'ArrowRight') select(current + 1)
+        if (e.code === 'ArrowLeft') select(current - 1)
+      })
+
+      select(0)
+    </script>
+  </body>
+</html>

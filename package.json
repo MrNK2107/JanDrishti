@@ -4,10 +4,14 @@
   "description": "Public Works Verification & Accountability Platform",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3002",
     "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest"
+    "preview": "vite preview --port 3002",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "contrast": "node tools/contrast.mjs",
+    "verify": "node tools/verify-browser.mjs",
+    "verify:full": "npm test && npm run contrast && npm run build && npm run verify"
   },
   "keywords": [
     "public-works",
