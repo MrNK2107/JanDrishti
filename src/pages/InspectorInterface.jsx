@@ -1,22 +1,27 @@
 /**
- * Field Inspector — verify on site.
+ * Field Inspector — record what is on site.
  *
- * Step two of the cycle. This is the only place a discrepancy can originate,
- * because it is the only place independent evidence enters the system.
- *
- * The verdict is shown immediately, on site, while the inspector can still
- * re-measure or photograph what is missing. Learning days later that a reading
- * triggered a formal finding is useless to everyone.
- *
- * A passing result is shown with the same prominence as a failing one. An
- * interface that only ever reacts to problems teaches people to distrust it.
+ * The verdict appears immediately, on site, while re-measurement is still
+ * possible. A passing result is shown with the same prominence as a failing one:
+ * an interface that only reacts to problems teaches people to distrust it, and
+ * most inspections are uneventful.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/StoreProvider'
-import { selectProjectViews } from '../domain/selectors'
+import { useToast } from '../components/feedback'
 import { PROJECT_STATUS_META, formatQuantity, TOLERANCE } from '../domain/reconcile'
-import { Button, Callout, Field, Panel, StatusBadge, StatusDot } from '../components/ui'
+import {
+  Button,
+  Callout,
+  EmptyState,
+  Field,
+  Panel,
+  Skeleton,
+  Spinner,
+  StatusBadge,
+  StatusDot,
+} from '../components/ui'
 
 const toneOf = (status) =>
   status === 'flagged'
@@ -25,98 +30,98 @@ const toneOf = (status) =>
       ? 'verified'
       : 'pending'
 
-/** Fixed site readings standing in for a device fix. No permission requested. */
-const SITE_FIX = {
-  'JDT-2026-0143': { place: 'T Nagar Main Rd', accuracy: '4 m' },
-  'JDT-2026-0138': { place: 'Anna Nagar West Ext', accuracy: '6 m' },
-  'JDT-2026-0152': { place: 'Saidapet Bridge', accuracy: '5 m' },
-}
-
 export default function InspectorInterface() {
-  const { dispatch, projectViews } = useStore()
+  const { projectViews, actions, pending, loading, session } = useStore()
+  const toast = useToast()
 
   const queue = projectViews.flatMap((p) => p.milestones.map((m) => ({ p, m })))
   const awaiting = queue.filter(({ m }) => m.report && !m.inspection)
-  const first = awaiting[0] ?? queue.find(({ m }) => m.report) ?? queue[0]
-
-  const [key, setKey] = useState(() => `${first?.p.id}/${first?.m.id}`)
+  const [selected, setSelected] = useState(null)
   const [observed, setObserved] = useState('')
   const [note, setNote] = useState('')
-  const [result, setResult] = useState(null)
 
-  const [projectId, milestoneId] = key.split('/')
+  // Default to the first milestone that needs a measurement, once loaded.
+  useEffect(() => {
+    if (selected && queue.some(({ p, m }) => `${p.id}/${m.id}` === selected)) return
+    const first = awaiting[0] ?? queue.find(({ m }) => m.report) ?? queue[0]
+    if (first) setSelected(`${first.p.id}/${first.m.id}`)
+  }, [queue, awaiting, selected])
+
+  if (loading && queue.length === 0) {
+    return (
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-5">
+        <Skeleton className="h-64" />
+        <Skeleton className="h-96" />
+      </div>
+    )
+  }
+
+  if (queue.length === 0) {
+    return <EmptyState title="No milestones assigned to you" />
+  }
+
+  const [projectId, milestoneId] = (selected ?? '').split('/')
   const project = projectViews.find((p) => p.id === projectId) ?? projectViews[0]
   const milestone =
     project?.milestones.find((m) => m.id === milestoneId) ?? project?.milestones[0]
 
-  if (!project || !milestone) return <p className="text-sm text-ink-muted">No milestones assigned.</p>
+  const unit = milestone?.commitment.unit === 'metre' ? 'm' : milestone?.commitment?.unit
+  const claimed = milestone?.report?.claimedQuantity ?? null
+  const busy = Boolean(pending.inspect)
 
-  const unit = milestone.commitment.unit === 'metre' ? 'm' : milestone.commitment.unit
-  const claimed = milestone.report?.claimedQuantity ?? null
-  const fix = SITE_FIX[project.id] ?? { place: project.ward, accuracy: '8 m' }
-
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (observed === '') return
-
-    const value = Number(observed)
-    let verdict = 'recorded'
-    let variance = null
-    if (claimed != null) {
-      variance = (value - claimed) / claimed
-      verdict =
-        Math.abs(variance) > TOLERANCE.observedVsReported
-          ? variance < 0
-            ? 'shortfall'
-            : 'overrun'
-          : 'matches'
-    }
-
-    dispatch({
-      type: 'RECORD_INSPECTION',
-      payload: {
-        projectId: project.id,
-        milestoneId: milestone.id,
-        observedQuantity: value,
-        inspectedBy: 'Insp. R. Karthikeyan',
-        note,
-      },
+    const res = await actions.recordInspection({
+      projectId: project.id,
+      milestoneId: milestone.id,
+      observedQuantity: Number(observed),
+      note,
     })
-
-    setResult({ verdict, variance, value, claimed, projectId: project.id, unit })
-    setObserved('')
-    setNote('')
+    if (res.ok) {
+      const opened = res.result?.opened ?? []
+      if (opened.length > 0) {
+        toast.error(
+          'Measurement recorded — discrepancy opened',
+          'Referred to the Ward Officer, who decides what happens next.'
+        )
+      } else {
+        toast.success('Measurement recorded', 'The reported figure is corroborated on site.')
+      }
+      setObserved('')
+      setNote('')
+    } else {
+      toast.error('Could not record the measurement', res.error?.message)
+    }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-ink">Record what is on site</h1>
+        <h1 className="text-2xl font-semibold text-ink">Assigned inspections</h1>
         <p className="text-sm text-ink-muted mt-1.5 max-w-3xl leading-relaxed">
-          Enter the quantity you actually measure. The system compares it against the
-          contractor&rsquo;s claim immediately, so you can re-measure before you leave if
-          something does not add up.
+          Enter the quantity you measure on site. The system compares it against the
+          contractor&rsquo;s reported figure immediately, so you can re-measure before
+          leaving if something does not add up.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-5 items-start">
         <Panel
-          title="Assigned to you"
-          subtitle={`${awaiting.length} awaiting a measurement`}
+          title="Your queue"
+          subtitle={`${awaiting.length} awaiting measurement`}
           className="[&>div]:p-0"
         >
           <ul className="divide-y divide-hairline">
             {queue.map(({ p, m }) => {
-              const active = p.id === project.id && m.id === milestone.id
+              const key = `${p.id}/${m.id}`
+              const active = selected === key
               const done = Boolean(m.inspection)
               return (
-                <li key={`${p.id}/${m.id}`}>
+                <li key={key}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setKey(`${p.id}/${m.id}`)
-                      setResult(null)
-                    }}
+                    onClick={() => setSelected(key)}
                     aria-current={active}
                     className={`w-full text-left px-4 py-3 transition-colors ${
                       active ? 'bg-sunken' : 'hover:bg-canvas'
@@ -129,9 +134,9 @@ export default function InspectorInterface() {
                         {done ? (
                           <StatusBadge tone="verified" label="Measured" size="sm" />
                         ) : m.report ? (
-                          <StatusBadge tone="pending" label="Claimed" size="sm" />
+                          <StatusBadge tone="pending" label="Reported" size="sm" />
                         ) : (
-                          <StatusBadge tone="neutral" label="No claim" size="sm" />
+                          <StatusBadge tone="neutral" label="No report" size="sm" />
                         )}
                       </span>
                     </div>
@@ -157,33 +162,37 @@ export default function InspectorInterface() {
           >
             {!milestone.report ? (
               <Callout tone="neutral" title="Nothing to verify yet">
-                No contractor claim exists for this milestone. An observation can only be
-                recorded against a claim — there is nothing to compare it to otherwise.
+                No completion report exists for this milestone. An observation can only be
+                recorded against a reported figure.
               </Callout>
             ) : (
               <>
-                {/* What is being verified */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
                   <Field label="Sanctioned" mono>
                     {formatQuantity(milestone.commitment.quantity, unit)}
                   </Field>
-                  <Field label="Contractor claims" mono>
+                  <Field label="Reported" mono>
                     {formatQuantity(milestone.report.claimedQuantity, unit)}
                   </Field>
-                  <Field label="Claimed by">
+                  <Field label="Reported by">
                     <span className="text-xs">{milestone.report.reportedBy}</span>
                   </Field>
-                  <Field label="Site fix" hint={`±${fix.accuracy}`}>
-                    <span className="text-xs">{fix.place}</span>
+                  <Field label="Recorded" mono>
+                    <span className="text-xs">
+                      {new Date(milestone.report.reportedAt).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                      })}
+                    </span>
                   </Field>
                 </div>
 
                 {milestone.inspection && (
                   <div className="mb-5">
                     <Callout tone="verified" title="Already measured">
-                      {formatQuantity(milestone.inspection.observedQuantity, unit)} recorded by{' '}
-                      {milestone.inspection.inspectedBy}. Submitting again supersedes that reading
-                      and is written to the audit trail.
+                      {formatQuantity(milestone.inspection.observedQuantity, unit)} was
+                      recorded by {milestone.inspection.inspectedBy}. Submitting again
+                      supersedes that reading and is written to the audit trail.
                     </Callout>
                   </div>
                 )}
@@ -201,7 +210,7 @@ export default function InspectorInterface() {
                         value={observed}
                         onChange={(e) => setObserved(e.target.value)}
                         placeholder={String(milestone.report.claimedQuantity)}
-                        className="w-full bg-paper border border-border rounded px-3 py-2.5 text-lg font-mono tabular-nums focus:outline-none focus:border-status-verified focus:ring-2 focus:ring-status-verified/20"
+                        className="w-full bg-paper border border-border rounded px-3 py-2.5 text-lg font-mono tabular-nums focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                       />
                     </label>
                     <label className="block">
@@ -213,97 +222,90 @@ export default function InspectorInterface() {
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="Where you measured from, what is physically present, what is missing"
-                        className="w-full bg-paper border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-status-verified focus:ring-2 focus:ring-status-verified/20 resize-y"
+                        className="w-full bg-paper border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-y"
                       />
                     </label>
                   </div>
 
                   <p className="text-xs text-ink-muted leading-relaxed">
                     A difference of more than{' '}
-                    {Math.round(TOLERANCE.observedVsReported * 100)}% from the contractor&rsquo;s
-                    claim will open a discrepancy automatically and refer it to a Ward Officer.
+                    {Math.round(TOLERANCE.observedVsReported * 100)}% from the reported
+                    figure opens a discrepancy automatically and refers it to the Ward
+                    Officer.
                   </p>
 
-                  <Button variant="primary" type="submit" disabled={observed === ''}>
-                    Submit measurement
+                  <Button variant="primary" type="submit" disabled={busy || observed === ''}>
+                    {busy ? (
+                      <>
+                        <Spinner /> Submitting…
+                      </>
+                    ) : (
+                      'Submit measurement'
+                    )}
                   </Button>
                 </form>
               </>
             )}
           </Panel>
 
-          {/* The verdict — explained, not just announced */}
-          {result && (
-            <Panel
-              tone={
-                result.verdict === 'matches'
-                  ? 'verified'
-                  : result.verdict === 'recorded'
-                    ? 'info'
-                    : 'flagged'
-              }
-              title={
-                result.verdict === 'matches'
-                  ? 'Measured — matches the claim'
-                  : result.verdict === 'shortfall'
-                    ? 'Measured — short of the claim'
-                    : result.verdict === 'overrun'
-                      ? 'Measured — more than claimed'
-                      : 'Measurement recorded'
-              }
-              subtitle={`${result.projectId} · ${result.value} ${result.unit}`}
-            >
-              {result.claimed != null && (
-                <div className="space-y-4">
-                  <dl className="border border-hairline rounded-lg divide-y divide-hairline">
-                    {[
-                      ['Contractor claimed', `${result.claimed} ${result.unit}`],
-                      ['You measured', `${result.value} ${result.unit}`],
-                      [
-                        'Difference',
-                        `${result.variance >= 0 ? '+' : ''}${(result.variance * 100).toFixed(1)}%`,
-                      ],
-                    ].map(([label, value]) => (
-                      <div key={label} className="flex items-baseline justify-between px-4 py-2.5">
-                        <dt className="text-sm text-ink-muted">{label}</dt>
-                        <dd className="font-mono text-sm tabular-nums text-ink">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-
-                  <Callout
-                    tone={result.verdict === 'matches' ? 'verified' : 'flagged'}
-                    title="What this means"
-                  >
-                    {result.verdict === 'matches' ? (
-                      <>
-                        The claim is corroborated by your independent measurement. No discrepancy
-                        was raised and the record now stands verified.
-                      </>
-                    ) : result.verdict === 'shortfall' ? (
-                      <>
-                        The work on site is{' '}
-                        <strong className="font-semibold">
-                          {result.claimed - result.value} {result.unit}
-                        </strong>{' '}
-                        short of what was claimed — beyond the{' '}
-                        {Math.round(TOLERANCE.observedVsReported * 100)}% tolerance. A discrepancy
-                        has been opened and referred to a Ward Officer, who decides what happens
-                        next. You have not decided anything; you have recorded what is there.
-                      </>
-                    ) : (
-                      <>
-                        More was found than the contractor claimed. This is recorded for
-                        completeness and referred for review.
-                      </>
-                    )}
-                  </Callout>
-                </div>
-              )}
-            </Panel>
+          {/* The most recent measurement by this inspector, with its consequence */}
+          {milestone.inspection && (
+            <MeasuredSummary milestone={milestone} claimed={claimed} unit={unit} />
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+function MeasuredSummary({ milestone, claimed, unit }) {
+  const observed = milestone.inspection.observedQuantity
+  const variance = claimed ? (observed - claimed) / claimed : null
+  const overTolerance = variance != null && Math.abs(variance) > TOLERANCE.observedVsReported
+  const matched = variance != null && !overTolerance
+
+  return (
+    <Panel
+      tone={matched ? 'verified' : 'flagged'}
+      title={matched ? 'Recorded — matches the reported figure' : 'Recorded — differs from the reported figure'}
+      subtitle={`Measured ${observed} ${unit}`}
+    >
+      {claimed != null && (
+        <div className="space-y-4">
+          <dl className="border border-hairline rounded-lg divide-y divide-hairline">
+            {[
+              ['Reported', `${claimed} ${unit}`],
+              ['Measured', `${observed} ${unit}`],
+              ['Difference', `${variance >= 0 ? '+' : ''}${(variance * 100).toFixed(1)}%`],
+            ].map(([label, value]) => (
+              <div key={label} className="flex items-baseline justify-between px-4 py-2.5">
+                <dt className="text-sm text-ink-muted">{label}</dt>
+                <dd className="font-mono text-sm tabular-nums text-ink">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <Callout tone={matched ? 'verified' : 'flagged'} title="What this means">
+            {matched ? (
+              <>
+                The reported figure is corroborated by your independent measurement. No
+                discrepancy was raised and the milestone now stands verified.
+              </>
+            ) : (
+              <>
+                The work on site is{' '}
+                <strong className="font-semibold">
+                  {claimed - observed} {unit}
+                </strong>{' '}
+                short of the reported figure — beyond the{' '}
+                {Math.round(TOLERANCE.observedVsReported * 100)}% tolerance. A discrepancy
+                has been opened and referred to the Ward Officer, who decides what happens
+                next. You have not decided anything; you recorded what is there.
+              </>
+            )}
+          </Callout>
+        </div>
+      )}
+    </Panel>
   )
 }

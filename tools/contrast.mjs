@@ -32,21 +32,24 @@ const ratio = (a, b) => {
 
 /** Tokens exactly as declared in tailwind.config.cjs. Keep in sync. */
 const T = {
-  canvas: '#F6F8FA',
+  canvas: '#F7F5F2',
   paper: '#FFFFFF',
-  sunken: '#EDF1F5',
-  ink: '#0F172A',
-  ink2: '#334155',
-  inkMuted: '#5A6B7F',
-  inkSubtle: '#7C8CA0',
+  sunken: '#F2EFEB',
+  muted: '#E9E5E0',
+  ink: '#1A1A1A',
+  ink2: '#3D3D3D',
+  inkMuted: '#5C5C5C',
+  inkSubtle: '#8A8A8A',
+  accent: '#1F5F55',
+  accentSoft: '#E9F1EF',
   statusVerified: '#2A9D8F',
-  statusFlagged: '#E7434F',
+  statusFlagged: '#E84954',
   statusPending: '#F4A261',
   statusInfo: '#3B82F6',
-  textVerified: '#217A70',
-  textFlagged: '#CA323E',
-  textPending: '#92613A',
-  textInfo: '#306BCA',
+  textVerified: '#20776D',
+  textFlagged: '#C8323D',
+  textPending: '#906039',
+  textInfo: '#3069C7',
   softVerified: '#E5F3F2',
   softFlagged: '#FDEBED',
   softPending: '#FDEBDC',
@@ -70,6 +73,7 @@ function buildRows() {
     ink: T.ink,
     'ink-2': T.ink2,
     'ink-muted': T.inkMuted,
+    accent: T.accent,
     'status-text verified': T.textVerified,
     'status-text flagged': T.textFlagged,
     'status-text pending': T.textPending,
@@ -91,6 +95,7 @@ function buildRows() {
   rows.push([T.textFlagged, T.softFlagged, 'flagged text on flagged soft', NORMAL])
   rows.push([T.textPending, T.softPending, 'pending text on pending soft', NORMAL])
   rows.push([T.textInfo, T.softInfo, 'info text on info soft', NORMAL])
+  rows.push([T.accent, T.accentSoft, 'accent text on accent soft', NORMAL])
 
   // Dark text on solid fills. White-on-fill is deliberately NOT listed and must
   // not be reintroduced: it measures 2.06–4.17:1 across these four hues, all

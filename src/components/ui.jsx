@@ -219,6 +219,32 @@ export function EmptyState({ title, children }) {
 }
 
 /**
+ * Loading placeholder. The API has latency, so every data view needs one — and
+ * a placeholder shaped like the content it replaces is far less jarring than a
+ * spinner, because the layout does not jump when the data lands.
+ */
+export function Skeleton({ className = '' }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`relative overflow-hidden rounded-lg bg-sunken ${className}`}
+    >
+      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-paper/60 to-transparent" />
+    </div>
+  )
+}
+
+/** Inline spinner for buttons and small waits. */
+export function Spinner({ className = '' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin ${className}`}
+    />
+  )
+}
+
+/**
  * A labelled callout for the "what this means" explanations. Used wherever the
  * interface needs to say something in words rather than imply it visually.
  */

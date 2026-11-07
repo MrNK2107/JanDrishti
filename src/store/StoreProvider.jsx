@@ -1,413 +1,227 @@
 /**
- * JanDrishti application store.
+ * Application store.
  *
- * One reducer, one source of truth, held in memory. Actions are the four things
- * a person can actually do in the system: register a claim, record an
- * observation, resolve a discrepancy, dismiss a discrepancy.
+ * The store is a *client*, not an owner. Records come from the API and are held
+ * here for rendering; nothing is mutated locally and hoped to match the server.
+ * After every write the relevant collections are re-read, so what is on screen
+ * is what the backend holds.
  *
- * Two deliberate properties:
+ * Two consequences worth stating:
  *
- *   1. **Derived values are never stored.** Milestone and project status are
- *      computed from the evidence on every render via `src/domain/selectors.js`.
- *      Storing them alongside the evidence would create two sources of truth
- *      that can disagree — which is precisely the failure mode this product
- *      exists to catch.
+ *   1. **Loading and error are real states.** Because the API has latency and
+ *      can fail, the interface must handle both. Without a client-server split
+ *      those code paths tend to not exist, which is why the app previously felt
+ *      weightless.
  *
- *   2. **Discrepancies are created by the reducer, not by the UI.** When an
- *      inspection arrives, the system reconciles and opens whatever records are
- *      warranted. The interface does not get to decide what counts as a
- *      deviation; the policy in `src/domain/reconcile.js` does.
+ *   2. **The session gates everything.** `session.ready` distinguishes "we do not
+ *      know yet" from "signed out", so a reload does not flash the sign-in page
+ *      before restoring a valid session.
  *
- * Every mutating action also appends to `auditLog`. Nothing is ever edited or
- * removed — that is the "traceability" principle made concrete.
+ * Derived values are still never stored — status is computed from records on
+ * every render, via `src/domain/selectors.js`.
  */
 
-import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
-import { createSeedState, DEMO_NOW } from '../domain/seed'
-import { deviations } from '../domain/reconcile'
-import { selectMilestoneViews, selectProjectViews } from '../domain/selectors'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react'
+import { api } from '../api/client'
+import { selectMilestoneViews, selectProjectViews, selectSummary } from '../domain/selectors'
 
 const StoreContext = createContext(null)
 
-/**
- * Session storage key, versioned.
- *
- * The app is a client-side SPA with no backend, so an in-memory store is lost
- * on every page load — and because navigating to a route directly is a full
- * document request, *any* hard navigation would silently discard every claim,
- * observation, and finding recorded so far. During a live walkthrough that is
- * a disaster: one refresh and the demo is back to seed.
- *
- * `sessionStorage` is the right scope rather than `localStorage`. It survives
- * reloads and hard navigation within the tab, which is what a demo needs, but
- * it does not leak yesterday's playthrough into a fresh tab.
- *
- * The version suffix means a change to the seed shape discards stale state
- * instead of hydrating a store that no longer matches the code.
- */
-export const STORAGE_KEY = 'jandrishti.state.v1'
-
-/** Read persisted state, or null if absent/corrupt/from another version. */
-function loadPersistedState() {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    // Minimal shape validation: a half-written record must not crash the app.
-    if (!parsed || !Array.isArray(parsed.projects) || !Array.isArray(parsed.discrepancies)) {
-      return null
-    }
-    if (!Array.isArray(parsed.auditLog)) return null
-    return parsed
-  } catch {
-    return null
-  }
+const INITIAL = {
+  session: { ready: false, user: null },
+  data: { projects: [], discrepancies: [], auditLog: [] },
+  loading: false,
+  /** Pending mutations keyed by a caller-supplied label, so buttons can show progress. */
+  pending: {},
+  error: null,
 }
 
-function persistState(state) {
-  if (typeof window === 'undefined') return
-  try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // Storage can be unavailable (private mode, quota). Losing persistence is
-    // an acceptable degradation; losing the session is not.
-  }
-}
-
-/** Deterministic id generation — counters, not randomness, so runs are reproducible. */
-const nextId = (prefix, existing, width = 4) =>
-  `${prefix}-${String(existing.length + 1).padStart(width, '0')}`
-
-/** Action labels shown in the audit trail. */
-const AUDIT_LABEL = {
-  milestone_reported: 'milestone_reported',
-  inspection_recorded: 'inspection_recorded',
-  discrepancy_opened: 'discrepancy_opened',
-  discrepancy_resolved: 'discrepancy_resolved',
-  discrepancy_dismissed: 'discrepancy_dismissed',
-  discrepancy_acknowledged: 'discrepancy_acknowledged',
-}
-
-function appendAudit(state, entry) {
-  return [
-    ...state.auditLog,
-    {
-      id: nextId('AUD', state.auditLog),
-      ...entry,
-    },
-  ]
-}
-
-/**
- * Open discrepancy records for every deviation the reconciliation rules found.
- * Called after an inspection is recorded — that is the only moment a new
- * finding can legitimately arise, because it is the only moment new independent
- * evidence enters the system.
- */
-function openDiscrepanciesFor(state, projectId, milestoneId) {
-  const project = state.projects.find((p) => p.id === projectId)
-  const milestone = project?.milestones.find((m) => m.id === milestoneId)
-  if (!milestone) return state
-
-  const found = deviations(milestone.commitment, milestone.report, milestone.inspection)
-
-  // Collapse the two quantity rules to a single record. A shortfall is one
-  // finding an official resolves once, not two rows saying the same thing.
-  const quantityFinding = found.find((f) => f.observedVariance !== null)
-  const otherFindings = found.filter((f) => f.observedVariance === null)
-
-  const toOpen = [
-    ...(quantityFinding ? [quantityFinding] : []),
-    ...otherFindings,
-  ]
-
-  // Suppress only duplicates *within this milestone*. Milestone ids are not
-  // globally unique — every project has an `MS-1` — so omitting projectId here
-  // would let one project's open finding silently suppress another's, which is
-  // precisely the failure this product exists to catch.
-  const alreadyOpen = new Set(
-    state.discrepancies
-      .filter(
-        (d) =>
-          d.projectId === projectId &&
-          d.milestoneId === milestoneId &&
-          d.status !== 'dismissed'
-      )
-      .map((d) => d.kind)
-  )
-
-  let next = state
-  for (const finding of toOpen) {
-    if (alreadyOpen.has(finding.kind)) continue
-
-    const record = {
-      id: nextId('DSC', next.discrepancies),
-      projectId,
-      milestoneId,
-      kind: finding.kind,
-      severity: finding.severity,
-      status: 'open',
-      openedAt: DEMO_NOW,
-      openedBy: 'System',
-      detail: finding.detail,
-      note: '',
-      resolvedAt: null,
-      resolvedBy: null,
-      resolution: null,
-    }
-
-    next = {
-      ...next,
-      discrepancies: [...next.discrepancies, record],
-      auditLog: appendAudit(next, {
-        at: DEMO_NOW,
-        actor: 'System',
-        role: 'system',
-        action: AUDIT_LABEL.discrepancy_opened,
-        subject: record.id,
-        note: finding.detail,
-      }),
-    }
-  }
-  return next
-}
-
-export function reducer(state, action) {
+function reducer(state, action) {
   switch (action.type) {
     /**
-     * Contractor files a completion claim against a milestone.
+     * The session has been resolved by the boot sequence. Distinct from
+     * SESSION_SET so that BOOT_DONE cannot overwrite a user who signed in while
+     * the boot request was still in flight.
      */
-    case 'REPORT_MILESTONE': {
-      const { projectId, milestoneId, claimedQuantity, reportedBy, note, evidenceLabel } =
-        action.payload
-
-      const projects = state.projects.map((project) => {
-        if (project.id !== projectId) return project
-        return {
-          ...project,
-          milestones: project.milestones.map((m) =>
-            m.id === milestoneId
-              ? {
-                  ...m,
-                  report: {
-                    id: nextId('RPT', state.projects.flatMap((p) =>
-                      p.milestones.map((x) => x.report).filter(Boolean)
-                    )),
-                    claimedQuantity: Number(claimedQuantity),
-                    reportedAt: DEMO_NOW,
-                    reportedBy,
-                    evidenceHash: `sha256:${hashish(`${projectId}${milestoneId}${claimedQuantity}`)}`,
-                    evidenceLabel: evidenceLabel || 'submission.jpg',
-                    note: note || '',
-                  },
-                  // A fresh claim invalidates any prior observation. Leaving a
-                  // stale inspection attached would let old evidence silently
-                  // vouch for new work.
-                  inspection: null,
-                }
-              : m
-          ),
-        }
-      })
-
-      const next = { ...state, projects }
+    case 'SESSION_RESOLVED':
       return {
-        ...next,
-        auditLog: appendAudit(next, {
-          at: DEMO_NOW,
-          actor: reportedBy,
-          role: 'contractor',
-          action: AUDIT_LABEL.milestone_reported,
-          subject: `${projectId} / ${milestoneId}`,
-          note: `Claimed ${claimedQuantity} complete.`,
-        }),
-      }
-    }
-
-    /**
-     * Inspector records an independent physical observation. This is the only
-     * action that can open a discrepancy.
-     */
-    case 'RECORD_INSPECTION': {
-      const { projectId, milestoneId, observedQuantity, inspectedBy, note, evidenceLabel } =
-        action.payload
-
-      const projects = state.projects.map((project) => {
-        if (project.id !== projectId) return project
-        return {
-          ...project,
-          milestones: project.milestones.map((m) =>
-            m.id === milestoneId
-              ? {
-                  ...m,
-                  inspection: {
-                    id: nextId('INS', state.projects.flatMap((p) =>
-                      p.milestones.map((x) => x.inspection).filter(Boolean)
-                    )),
-                    observedQuantity: Number(observedQuantity),
-                    inspectedAt: DEMO_NOW,
-                    inspectedBy,
-                    // Deliberately distinct from the contractor hash. If these
-                    // ever matched, the duplicate-evidence rule would fire,
-                    // which is the correct behaviour.
-                    evidenceHash: `sha256:${hashish(`insp${projectId}${milestoneId}${observedQuantity}`)}`,
-                    evidenceLabel: evidenceLabel || 'inspection.jpg',
-                    note: note || '',
-                  },
-                }
-              : m
-          ),
-        }
-      })
-
-      let next = { ...state, projects }
-      next = {
-        ...next,
-        auditLog: appendAudit(next, {
-          at: DEMO_NOW,
-          actor: inspectedBy,
-          role: 'inspector',
-          action: AUDIT_LABEL.inspection_recorded,
-          subject: `${projectId} / ${milestoneId}`,
-          note: `Observed ${observedQuantity}.`,
-        }),
+        ...state,
+        session: { ready: true, user: action.user },
+        booting: false,
       }
 
-      // The system reconciles immediately. This is the product.
-      return openDiscrepanciesFor(next, projectId, milestoneId)
+    case 'BOOT_DONE':
+      return { ...state, session: { ...state.session, ready: true } }
+
+    case 'SESSION_SET':
+      return { ...state, session: { ready: true, user: action.user } }
+
+    case 'SESSION_CLEAR':
+      return { ...state, session: { ready: true, user: null } }
+
+    case 'DATA_SET':
+      return { ...state, data: action.data, error: null }
+
+    case 'LOADING':
+      return { ...state, loading: action.value }
+
+    case 'PENDING': {
+      const pending = { ...state.pending }
+      if (action.value) pending[action.key] = true
+      else delete pending[action.key]
+      return { ...state, pending }
     }
 
-    case 'RESOLVE_DISCREPANCY': {
-      const { discrepancyId, resolvedBy, resolution } = action.payload
-      const discrepancies = state.discrepancies.map((d) =>
-        d.id === discrepancyId
-          ? {
-              ...d,
-              status: 'resolved',
-              resolvedAt: DEMO_NOW,
-              resolvedBy,
-              resolution,
-            }
-          : d
-      )
-      const next = { ...state, discrepancies }
-      return {
-        ...next,
-        auditLog: appendAudit(next, {
-          at: DEMO_NOW,
-          actor: resolvedBy,
-          role: 'admin',
-          action: AUDIT_LABEL.discrepancy_resolved,
-          subject: discrepancyId,
-          note: resolution,
-        }),
-      }
-    }
+    case 'ERROR':
+      return { ...state, error: action.error }
 
-    case 'DISMISS_DISCREPANCY': {
-      const { discrepancyId, resolvedBy, resolution } = action.payload
-      const discrepancies = state.discrepancies.map((d) =>
-        d.id === discrepancyId
-          ? {
-              ...d,
-              status: 'dismissed',
-              resolvedAt: DEMO_NOW,
-              resolvedBy,
-              resolution,
-            }
-          : d
-      )
-      const next = { ...state, discrepancies }
-      return {
-        ...next,
-        auditLog: appendAudit(next, {
-          at: DEMO_NOW,
-          actor: resolvedBy,
-          role: 'admin',
-          action: AUDIT_LABEL.discrepancy_dismissed,
-          subject: discrepancyId,
-          note: resolution,
-        }),
-      }
-    }
-
-    case 'ACKNOWLEDGE_DISCREPANCY': {
-      const { discrepancyId, actor } = action.payload
-      const discrepancies = state.discrepancies.map((d) =>
-        d.id === discrepancyId && d.status === 'open'
-          ? { ...d, status: 'under_review' }
-          : d
-      )
-      const next = { ...state, discrepancies }
-      return {
-        ...next,
-        auditLog: appendAudit(next, {
-          at: DEMO_NOW,
-          actor,
-          role: 'admin',
-          action: AUDIT_LABEL.discrepancy_acknowledged,
-          subject: discrepancyId,
-          note: 'Marked under review.',
-        }),
-      }
-    }
-
-    case 'RESET_DEMO':
-      return createSeedState()
+    case 'CLEAR_ERROR':
+      return { ...state, error: null }
 
     default:
       return state
   }
 }
 
-/**
- * A tiny deterministic string hash. Not cryptographic and not pretending to be
- * — it exists so that evidence identifiers are stable across runs, which a
- * random UUID would not give us.
- */
-function hashish(input) {
-  let h = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h.toString(16).padStart(8, '0')
-}
-
 export function StoreProvider({ children, initialState }) {
-  const [state, dispatch] = useReducer(
-    reducer,
-    initialState,
-    // Explicit initial state (tests) wins; otherwise resume the session, and
-    // only fall back to the seed when there is nothing to resume.
-    (init) => init ?? loadPersistedState() ?? createSeedState()
+  const [state, dispatch] = useReducer(reducer, initialState ?? INITIAL)
+
+  /** Re-read every collection. Cheap here; with a real API these would be
+   *  scoped to what changed. */
+  const refresh = useCallback(async () => {
+    const [projects, discrepancies, audit] = await Promise.all([
+      api.listProjects(),
+      api.listDiscrepancies(),
+      api.listAudit(),
+    ])
+    dispatch({
+      type: 'DATA_SET',
+      data: {
+        projects: projects.projects,
+        discrepancies: discrepancies.discrepancies,
+        auditLog: audit.auditLog,
+      },
+    })
+  }, [])
+
+  /**
+   * Boot: restore any valid session, then load the ward's records.
+   *
+   * Written to be idempotent, because React 18 StrictMode mounts effects twice in
+   * development. Two failure modes were hit here while getting it right, and both
+   * are recorded because either would silently corrupt a session:
+   *
+   *   - A boot that ran twice raced itself and dropped a valid session, so every
+   *     reload appeared to sign the user out.
+   *   - Aborting dispatch on the StrictMode "unmount" left the app stuck on the
+   *     loading screen forever, because the first cleanup ran before the real
+   *     mount and suppressed every subsequent dispatch.
+   *
+   * So: start the work once (ref), and let it complete. Dispatching after an
+   * unmount is a no-op in React 18, so there is nothing to protect against.
+   */
+  const bootedRef = useRef(false)
+
+  useEffect(() => {
+    if (bootedRef.current) return
+    bootedRef.current = true
+
+    ;(async () => {
+      try {
+        const { user } = await api.me()
+        dispatch({ type: 'SESSION_RESOLVED', user })
+        if (user) await refresh()
+      } catch (err) {
+        dispatch({ type: 'SESSION_RESOLVED', user: null })
+        dispatch({ type: 'ERROR', error: err })
+      }
+    })()
+  }, [refresh])
+
+  /**
+   * Run a mutation, then resync. `key` labels the operation so the calling
+   * button can disable itself and show progress without global spinners.
+   */
+  const run = useCallback(
+    async (key, fn) => {
+      dispatch({ type: 'PENDING', key, value: true })
+      dispatch({ type: 'CLEAR_ERROR' })
+      try {
+        const result = await fn()
+        await refresh()
+        return { ok: true, result }
+      } catch (err) {
+        dispatch({ type: 'ERROR', error: err })
+        return { ok: false, error: err }
+      } finally {
+        dispatch({ type: 'PENDING', key, value: false })
+      }
+    },
+    [refresh]
   )
 
-  // Persist on every transition. `RESET_DEMO` writes the fresh seed back, so a
-  // reset is durable rather than being undone by the next reload.
-  useEffect(() => {
-    persistState(state)
-  }, [state])
+  const actions = useMemo(
+    () => ({
+      async login(credentials) {
+        const res = await run('auth', () => api.login(credentials))
+        if (res.ok) dispatch({ type: 'SESSION_SET', user: res.result.user })
+        return res
+      },
 
-  // Derived views. Recomputed when state changes, memoised per state identity.
-  const projectViews = useMemo(() => selectProjectViews(state), [state])
-  const milestoneViews = useMemo(() => selectMilestoneViews(state), [state])
+      async signup(payload) {
+        const res = await run('auth', () => api.signup(payload))
+        if (res.ok) dispatch({ type: 'SESSION_SET', user: res.result.user })
+        return res
+      },
 
-  // Expose the store for end-to-end verification. The browser check in
-  // tools/verify-browser.mjs needs to assert on records, not on whether a
-  // particular string happened to appear somewhere in the DOM.
-  if (typeof window !== 'undefined') {
-    window.__JANDRISHTI__ = {
-      getState: () => state,
-      discrepancies: () => state.discrepancies,
-      audit: () => state.auditLog,
-    }
-  }
+      async logout() {
+        await api.logout().catch(() => {})
+        dispatch({ type: 'SESSION_SET', user: null })
+        dispatch({ type: 'DATA_SET', data: INITIAL.data })
+        return { ok: true }
+      },
+
+      reportMilestone: (payload) => run('report', () => api.reportMilestone(payload)),
+      recordInspection: (payload) => run('inspect', () => api.recordInspection(payload)),
+      decideDiscrepancy: (payload) => run('decide', () => api.decideDiscrepancy(payload)),
+      acknowledgeDiscrepancy: (payload) =>
+        run('acknowledge', () => api.acknowledgeDiscrepancy(payload)),
+
+      clearError: () => dispatch({ type: 'CLEAR_ERROR' }),
+    }),
+    [run]
+  )
+
+  const projectViews = useMemo(() => selectProjectViews(state.data), [state.data])
+  const milestoneViews = useMemo(() => selectMilestoneViews(state.data), [state.data])
+  const summary = useMemo(
+    () => selectSummary(state.data, projectViews),
+    [state.data, projectViews]
+  )
 
   const value = useMemo(
-    () => ({ state, dispatch, projectViews, milestoneViews }),
-    [state, projectViews, milestoneViews]
+    () => ({
+      session: state.session,
+      data: state.data,
+      loading: state.loading,
+      pending: state.pending,
+      error: state.error,
+      actions,
+      projectViews,
+      milestoneViews,
+      summary,
+      /** True while any mutation is in flight. */
+      busy: Object.keys(state.pending).length > 0,
+    }),
+    [state, actions, projectViews, milestoneViews, summary]
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
@@ -419,10 +233,9 @@ export function useStore() {
   return ctx
 }
 
-/** Convenience hook: the fully-derived view of one project, or undefined. */
-export function useProject(projectId) {
-  const { projectViews } = useStore()
-  return projectViews.find((p) => p.id === projectId)
+/** Redirect helper: the signed-in user, or null. */
+export function useUser() {
+  return useStore().session.user
 }
 
-export { DEMO_NOW }
+export { INITIAL }

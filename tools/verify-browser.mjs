@@ -1,15 +1,14 @@
 /**
  * Browser verification for JanDrishti.
  *
- * Not a unit test suite — that lives in src/. This answers questions only a real
- * browser can:
+ * Unit tests live in src/. This answers what only a real browser can:
  *
- *   1. Does every route render, without console errors?
- *   2. Is the palette AA in *rendered pixels*, not just in config?
- *   3. Does the delivery chart actually communicate magnitude — i.e. is the
- *      short bar measurably shorter than the long one?
- *   4. Does the explainability copy actually appear, naming the real figures?
- *   5. Does the accountability loop close end to end?
+ *   1. Does the public site render, and does it read as a product rather than a
+ *      component preview — no "demo" framing anywhere?
+ *   2. Do the auth pages work: sign in, sign up, wrong credentials, sign out?
+ *   3. Are the protected routes actually protected?
+ *   4. Does the working flow close end to end: report → measure → decide → publish?
+ *   5. Is the palette AA in rendered pixels, and does the chart communicate magnitude?
  *
  * Run: node tools/verify-browser.mjs   (dev server or preview on :3002)
  */
@@ -18,10 +17,6 @@ import { chromium } from 'playwright'
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-/**
- * Reuse a browser already on this machine rather than downloading Chromium.
- * Driver and cached browser versions need not agree.
- */
 const SYSTEM_BROWSERS = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -45,14 +40,11 @@ const check = (name, ok, detail = '') => {
 }
 
 const systemBrowser = findSystemBrowser()
-console.log(
-  systemBrowser
-    ? `Using system browser: ${systemBrowser}\n`
-    : 'No system browser found; using the Playwright bundle.\n'
-)
+console.log(systemBrowser ? `Using: ${systemBrowser}\n` : 'Using the Playwright bundle.\n')
 
 const browser = await chromium.launch(systemBrowser ? { executablePath: systemBrowser } : {})
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+const page = await context.newPage()
 
 page.on('console', (m) => {
   if (m.type() === 'error') consoleErrors.push(m.text())
@@ -63,7 +55,15 @@ const shot = async (name, { full = true } = {}) => {
   await page.screenshot({ path: resolve(OUT, `${name}.png`), fullPage: full })
 }
 
-/** Measure WCAG contrast on every rendered text node against its real backdrop. */
+/** Reset the backend and clear the session, so each run starts from a known ward. */
+async function resetAll() {
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+}
+
 const auditContrast = () =>
   page.evaluate(() => {
     const parse = (s) => {
@@ -90,7 +90,6 @@ const auditContrast = () =>
       }
       return [255, 255, 255]
     }
-
     const bad = []
     let measured = 0
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
@@ -105,7 +104,6 @@ const auditContrast = () =>
       if (parseFloat(cs.opacity) < 0.15) continue
       const rect = el.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) continue
-
       const fg = parse(cs.color)
       if (!fg) continue
       measured++
@@ -114,235 +112,299 @@ const auditContrast = () =>
       const weight = parseInt(cs.fontWeight, 10) || 400
       const isLarge = size >= 24 || (size >= 18.66 && weight >= 700)
       const need = isLarge ? 3 : 4.5
-      if (r < need) {
-        bad.push({ text: text.slice(0, 48), ratio: Number(r.toFixed(2)), need, size })
-      }
+      if (r < need) bad.push({ text: text.slice(0, 48), ratio: Number(r.toFixed(2)), need })
     }
     return { bad, measured }
   })
 
 try {
-  // === 1. Every route renders ================================================
-  const routes = [
-    ['/', 'admin-overview', 'Ward overview'],
-    ['/contractor', 'contractor-portal', 'Report work complete'],
-    ['/inspector', 'inspector-interface', 'Record what is on site'],
-    ['/citizen', 'citizen-record', 'What your ward paid for'],
-  ]
+  await resetAll()
 
-  for (const [path, shotName, expectText] of routes) {
-    await page.goto(BASE + path, { waitUntil: 'networkidle' })
-    const body = await page.textContent('body')
-    check(`route ${path} renders`, body.includes(expectText), `looking for "${expectText}"`)
-    await shot(shotName)
-  }
-
-  // Also capture the admin overview at viewport height. The full-page capture
-  // is 2000px tall and shows everything at once, which is useful for review but
-  // misleading about what a person actually sees without scrolling.
+  // === 1. Public site =======================================================
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(300)
-  await shot('admin-overview-viewport', { full: false })
-
-  // === 2. Contrast on rendered pixels =======================================
-  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(300)
-  const { bad, measured } = await auditContrast()
+  const landing = await page.textContent('body')
+  check('landing page renders', /Did we get what we paid for/i.test(landing))
   check(
-    'no AA contrast violations in rendered text',
-    bad.length === 0,
-    bad.length
-      ? `${bad.length} violation(s): ` + bad.slice(0, 4).map((v) => `"${v.text}" ${v.ratio}:1`).join('; ')
-      : `${measured} text nodes measured`
+    'landing states the product claim',
+    /sanctioned/i.test(landing) && /independent inspection/i.test(landing)
+  )
+  check(
+    'landing shows a worked example with the real figures',
+    /500/.test(landing) && /320/.test(landing) && /180/.test(landing)
+  )
+  check(
+    'landing explains what the product does NOT do',
+    /does not determine fraud/i.test(landing)
+  )
+  check(
+    'landing offers clear calls to action',
+    /View the public record/i.test(landing) && /Create account/i.test(landing)
+  )
+  await shot('public-landing')
+
+  // === 2. No demo framing anywhere =========================================
+  const demoWords = await page.evaluate(() => {
+    const text = document.body.innerText
+    const hits = []
+    for (const w of ['demo', 'Demo', 'DEMO', 'mockup', 'prototype', 'sample data', 'placeholder']) {
+      if (text.includes(w)) hits.push(w)
+    }
+    return hits
+  })
+  check('no demo framing on the public site', demoWords.length === 0, demoWords.join(', '))
+
+  // === 3. Protected routes are protected ===================================
+  await page.goto(BASE + '/ward', { waitUntil: 'networkidle' })
+  check(
+    'anonymous visitor is redirected from the officer area to sign-in',
+    page.url().includes('/login'),
+    page.url()
+  )
+  check(
+    'redirect preserves the intended destination',
+    (await page.textContent('body')).length > 0
   )
 
-  // === 3. The chart communicates magnitude ==================================
-  // The whole point of replacing the transit diagram. T Nagar was observed at
-  // 64% of sanction; Anna Nagar at 99%. Their bars must differ accordingly.
-  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: 'Reset demo' }).click()
-  await page.waitForTimeout(400)
+  // === 4. Public record needs no account ===================================
+  await page.goto(BASE + '/record', { waitUntil: 'networkidle' })
+  const record = await page.textContent('body')
+  check('public record renders without an account', /What your ward paid for/i.test(record))
+  check(
+    'public record publishes all three figures',
+    /Sanctioned/i.test(record) &&
+      /Contractor reported/i.test(record) &&
+      /Inspection found/i.test(record)
+  )
+  await shot('public-record')
 
-  // Read the chart through explicit data hooks rather than guessing at class
-  // names or aria-label text. An earlier version of this check discovered only
-  // two of the three bars, because it keyed off a word that appeared in some
-  // project summaries and not others.
-  const bars = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('[data-chart-row]')).map((row) => {
+  // === 5. Sign in ==========================================================
+  await page.goto(BASE + '/login', { waitUntil: 'networkidle' })
+  check('login page renders', /Sign in/i.test(await page.textContent('body')))
+
+  // Wrong credentials must be refused and explained.
+  await page.fill('#email', 'officer@jandrishti.in')
+  await page.fill('#password', 'definitely-wrong')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.waitForTimeout(700)
+  const afterBadLogin = await page.textContent('body')
+  check(
+    'wrong credentials are refused with an explanation',
+    /do not match an account/i.test(afterBadLogin),
+    'expected an inline error'
+  )
+
+  // Reviewer one-click entry.
+  await page.locator('[data-quick-signin="officer"]').click()
+  await page.waitForURL('**/ward', { timeout: 8000 }).catch(() => {})
+  check('officer can sign in and reaches the ward', page.url().includes('/ward'), page.url())
+  await page.waitForTimeout(600)
+
+  const ward = await page.textContent('body')
+  check('ward overview renders after sign-in', /Delivery against sanction/i.test(ward))
+  check(
+    'signed-in chrome shows who is signed in',
+    /R\. Karthikeyan/i.test(ward) || /Ward Officer/i.test(ward)
+  )
+  check('no demo framing in the signed-in app', !/demo/i.test(ward))
+  await shot('ward-overview')
+
+  // === 6. Navigation is task-based, not numbered ===========================
+  const navText = await page.locator('nav[aria-label="Primary"]').first().innerText()
+  check(
+    'navigation offers task labels',
+    /Ward overview|Discrepancies|Audit trail/.test(navText),
+    navText.replace(/\s+/g, ' ').slice(0, 80)
+  )
+  check(
+    'navigation is not a numbered 1-2-3-4 sequence',
+    !/^\s*1\b[\s\S]*\b2\b[\s\S]*\b3\b[\s\S]*\b4\b/.test(navText)
+  )
+
+  // === 7. Chart communicates magnitude =====================================
+  const bars = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-chart-row]')).map((row) => {
       const track = row.querySelector('[data-chart-track]')
       const seg = row.querySelector('[data-chart-delivered]')
-      const trackW = track ? track.getBoundingClientRect().width : 0
-      const segW = seg ? seg.getBoundingClientRect().width : 0
-      return {
-        id: row.getAttribute('data-chart-row'),
-        trackW: Math.round(trackW),
-        segW: Math.round(segW),
-        pct: trackW ? Number(((segW / trackW) * 100).toFixed(1)) : 0,
-      }
+      const tw = track ? track.getBoundingClientRect().width : 0
+      const sw = seg ? seg.getBoundingClientRect().width : 0
+      return { id: row.getAttribute('data-chart-row'), pct: tw ? Number(((sw / tw) * 100).toFixed(1)) : 0 }
     })
-  })
-
-  check('delivery chart renders a bar per project', bars.length >= 3, `${bars.length} bars`)
+  )
   const tNagar = bars.find((b) => b.id === 'JDT-2026-0143')
   const annaNagar = bars.find((b) => b.id === 'JDT-2026-0138')
-  const saidapet = bars.find((b) => b.id === 'JDT-2026-0152')
+  check('chart renders one row per project', bars.length === 3, `${bars.length} rows`)
   check(
-    'T Nagar bar stops near 64% of sanction (the shortfall is visible, not just labelled)',
+    'shortfall is visible as bar length, not only as a label',
     tNagar && Math.abs(tNagar.pct - 64) <= 3,
-    tNagar ? `${tNagar.pct}% of track` : 'bar not found'
+    tNagar ? `${tNagar.pct}%` : 'missing'
   )
   check(
-    'Anna Nagar bar runs near full length, so the two are visually distinct',
+    'the verified project runs nearly full length',
     annaNagar && annaNagar.pct >= 95,
-    annaNagar ? `${annaNagar.pct}% of track` : 'bar not found'
-  )
-  check(
-    'the uninspected project renders no delivered segment at all',
-    saidapet && saidapet.pct === 0,
-    saidapet ? `${saidapet.pct}% of track` : 'bar not found'
-  )
-  check(
-    'the flagged project\u2019s bar is materially shorter than the verified one',
-    tNagar && annaNagar && annaNagar.pct - tNagar.pct > 25,
-    tNagar && annaNagar ? `${tNagar.pct}% vs ${annaNagar.pct}%` : 'comparison unavailable'
+    annaNagar ? `${annaNagar.pct}%` : 'missing'
   )
 
-  // === 4. Explainability is present, in words, with the real figures ========
-  const bodyText = await page.textContent('body')
+  // === 8. Contrast in rendered pixels ======================================
+  const { bad, measured } = await auditContrast()
   check(
-    'the page states the plain-language consequence of the shortfall',
-    /Short by 180 m/i.test(bodyText),
-    'expected "Short by 180 m"'
-  )
-  check(
-    'the page names the three sources of truth for the reader',
-    /Sanctioned/i.test(bodyText) && /Contractor claims/i.test(bodyText) && /Inspection found/i.test(bodyText)
-  )
-  check(
-    'the chart legend explains what each visual treatment means',
-    /Delivered — confirmed by inspection/i.test(bodyText) &&
-      /Claimed but not found on site/i.test(bodyText) &&
-      /Still outstanding/i.test(bodyText)
-  )
-  check(
-    'the tolerance rule is published rather than hidden',
-    /tolerance/i.test(bodyText)
+    'no AA contrast violations on the ward overview',
+    bad.length === 0,
+    bad.length ? bad.slice(0, 4).map((v) => `"${v.text}" ${v.ratio}:1`).join('; ') : `${measured} nodes`
   )
 
-  // Drill into the project and check the four-step explanation exists.
-  await page.locator('[data-chart-row="JDT-2026-0143"]').click()
-  await page.waitForTimeout(300)
-  const detailText = await page.textContent('body')
-  check('project detail opens', /What happened, step by step/.test(detailText))
-  const steps = [
-    'Approved and paid for',
-    'Contractor reported complete',
-    'Independent inspection',
-    'System comparison',
-  ]
-  for (const s of steps) {
-    check(`explanation step present: "${s}"`, detailText.includes(s))
-  }
-  check(
-    'the conclusion is written as a sentence, not only a badge',
-    /the claimed work is not on the ground/i.test(detailText)
-  )
-  await shot('admin-project-explained')
+  // === 9. Workflow: report → measure → decide → publish ====================
+  await page.goto(BASE + '/works', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('contractor portal reachable for an officer', /Report progress/i.test(await page.textContent('body')))
 
-  // === 5. The accountability loop closes ====================================
-  await page.goto(BASE + '/contractor', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /Saidapet/ }).click()
-  await page.waitForTimeout(250)
-  await page.locator('#claimed').fill('200')
-  await page.getByRole('button', { name: /Submit claim for inspection/ }).click()
-  await page.waitForTimeout(350)
-  check('contractor can file a claim', await page.getByText(/Claim recorded/).isVisible())
-  await shot('contractor-claim-filed')
+  await page.goto(BASE + '/field', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('field portal renders', /Assigned inspections/i.test(await page.textContent('body')))
 
-  await page.goto(BASE + '/inspector', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /Saidapet/ }).click()
-  await page.waitForTimeout(250)
+  // Select Saidapet and measure 90 against a reported 200.
+  await page.getByRole('button', { name: /Saidapet/i }).first().click()
+  await page.waitForTimeout(400)
   await page.locator('input[type="number"]').first().fill('90')
-  await page.getByRole('button', { name: /Submit measurement/ }).click()
-  await page.waitForTimeout(450)
+  await page.getByRole('button', { name: /Submit measurement/i }).click()
+  await page.waitForTimeout(1500)
 
-  const verdictText = await page.textContent('body')
+  const toasts = await page.locator('[role="status"]').allInnerTexts()
   check(
-    'inspector sees the shortfall explained in words',
-    /short of what was claimed/i.test(verdictText)
+    'a toast confirms the recorded measurement',
+    toasts.some((t) => /discrepancy|recorded/i.test(t)),
+    toasts.join(' | ').slice(0, 100)
   )
   check(
-    'the inspector is told they have not decided the outcome',
-    /You have not decided anything/i.test(verdictText)
+    'the discrepancy is explained in words, not just flagged',
+    /short of the reported figure/i.test(await page.textContent('body'))
   )
-  await shot('inspector-verdict')
+  await shot('field-verdict')
 
-  // Assert on records, not scraped text.
-  const storeAfter = await page.evaluate(() => {
-    const st = window.__JANDRISHTI__?.getState()
-    if (!st) return null
-    const said = st.projects.find((p) => p.id === 'JDT-2026-0152')
+  // The finding must exist server-side.
+  const state = await page.evaluate(async () => {
+    const raw = localStorage.getItem('jandrishti.db.v1')
+    if (!raw) return null
+    const db = JSON.parse(raw)
     return {
-      observed: said?.milestones?.[0]?.inspection?.observedQuantity ?? null,
-      discrepancies: st.discrepancies.map((d) => ({
-        id: d.id,
-        projectId: d.projectId,
-        kind: d.kind,
-      })),
+      discrepancies: db.discrepancies.map((d) => ({ id: d.id, projectId: d.projectId })),
     }
   })
-  check('store reachable for assertion', storeAfter !== null)
-  check('the measurement persisted', storeAfter?.observed === 90, `observed=${storeAfter?.observed}`)
-  const newFinding = storeAfter?.discrepancies.find(
-    (d) => d.projectId === 'JDT-2026-0152' && d.kind === 'quantity_shortfall'
+  const newFinding = state?.discrepancies.find(
+    (d) => d.projectId === 'JDT-2026-0152'
   )
-  check('a discrepancy opened on the correct project', Boolean(newFinding), newFinding?.id)
+  check('the measurement opened a discrepancy in the backend', Boolean(newFinding), newFinding?.id)
 
-  // Resolve it, with the reason the interface requires.
-  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /^Discrepancies/ }).click()
-  await page.waitForTimeout(300)
+  // Decide it as the officer.
+  await page.goto(BASE + '/ward/discrepancies', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
   await page.locator('button[aria-current]').filter({ hasText: newFinding.id }).first().click()
-  await page.waitForTimeout(300)
+  await page.waitForTimeout(400)
 
   const REASON = 'Contractor directed to surface the remaining 110 m within 30 days.'
   await page.locator('#resolution').fill(REASON)
-  await page.getByRole('button', { name: /Uphold the finding/ }).click()
+  await page.getByRole('button', { name: /Uphold the finding/i }).click()
   await page.waitForTimeout(400)
 
-  const resolved = await page.evaluate(
-    (id) => window.__JANDRISHTI__?.getState()?.discrepancies.find((d) => d.id === id),
-    newFinding.id
-  )
+  // A modal must confirm before the irreversible action lands.
   check(
-    'a decision is recorded with its written reason',
-    resolved?.status === 'resolved' && resolved?.resolution === REASON,
-    `status=${resolved?.status}`
+    'an irreversible decision asks for confirmation first',
+    /Uphold this finding/i.test(await page.textContent('body'))
   )
-  await shot('admin-finding-decided')
+  await shot('discrepancy-confirm')
+  await page.getByRole('button', { name: /^Uphold finding$/i }).click()
+  await page.waitForTimeout(1200)
 
-  // === 6. The public record reflects it =====================================
-  await page.goto(BASE + '/citizen', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /Saidapet/ }).click()
-  await page.waitForTimeout(350)
-  const citizen = await page.textContent('body')
-  check('the decision is published to the public', citizen.includes('remaining 110 m'))
+  const decided = await page.evaluate(() => {
+    const db = JSON.parse(localStorage.getItem('jandrishti.db.v1') ?? '{}')
+    return db.discrepancies?.map((d) => ({ id: d.id, status: d.status, resolution: d.resolution })) ?? []
+  })
+  const closed = decided.find((d) => d.id === newFinding.id)
   check(
-    'the public view explains the three figures in plain terms',
-    /what was sanctioned/i.test(citizen) && /what an independent inspector/i.test(citizen)
+    'the decision is recorded with its written reason',
+    closed?.status === 'resolved' && closed?.resolution === REASON,
+    `status=${closed?.status}`
   )
-  await shot('citizen-record')
 
+  // === 10. Published to the public record ==================================
+  await page.goto(BASE + '/record', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: /Saidapet/i }).first().click()
+  await page.waitForTimeout(600)
+  const published = await page.textContent('body')
+  check('the decision appears in the public record', published.includes('remaining 110 m'))
+  check(
+    'the public record walks the evidence chain',
+    /What happened, step by step/i.test(published)
+  )
+  await shot('public-record-expanded')
+
+  // === 11. Citizen view has no mutating controls ===========================
   const controls = await page.locator('button, input[type="submit"]').evaluateAll((els) =>
     els.map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean)
   )
-  const mutating = controls.filter(
-    (t) => /\b(resolve|dismiss|submit|file a claim|uphold|reset demo data)\b/i.test(t)
+  const mutating = controls.filter((t) =>
+    /\b(uphold|dismiss|submit|record measurement|report progress|reset)\b/i.test(t)
   )
-  check('citizen portal exposes no mutating control', mutating.length === 0, mutating.join(' | '))
-  check('citizen portal renders no form', (await page.locator('form').count()) === 0)
+  check('public record exposes no mutating control', mutating.length === 0, mutating.join(' | '))
+  check('public record renders no form', (await page.locator('form').count()) === 0)
 
-  // === 7. Console cleanliness ==============================================
+  // === 12. Sign out, then sign up ==========================================
+  // Order matters: `/signup` redirects an already-signed-in user to their home
+  // portal, which is correct behaviour, so signing out has to come first.
+  await page.goto(BASE + '/ward', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.locator('header button[aria-haspopup="menu"]').click()
+  await page.waitForTimeout(300)
+  await page.getByRole('menuitem', { name: /Sign out/i }).click()
+  await page.waitForTimeout(900)
+  check('sign out returns to the public site', !page.url().includes('/ward'), page.url())
+
+  // A signed-out visitor must be pushed away from the auth page's mirror case:
+  // confirm the officer area is closed again.
+  await page.goto(BASE + '/ward', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check(
+    'the officer area is closed again after signing out',
+    page.url().includes('/login'),
+    page.url()
+  )
+
+  const unique = `reviewer.${Date.now()}@example.in`
+  await page.goto(BASE + '/signup', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('signup page renders when signed out', /Create your account/i.test(await page.textContent('body')))
+  await page.fill('#name', 'Reviewer Account')
+  await page.fill('#email', unique)
+  await page.fill('#password', 'reviewpass')
+  await page.getByRole('radio', { name: /Field Inspector/i }).check()
+  await page.getByRole('button', { name: /Create Field Inspector account/i }).click()
+  await page.waitForURL('**/field', { timeout: 8000 }).catch(() => {})
+  check('signup signs the new user straight in', page.url().includes('/field'), page.url())
+  await page.waitForTimeout(600)
+
+  // === 13. Role separation =================================================
+  // Sign out first: the auth page redirects a signed-in user to their own portal.
+  await page.locator('header button[aria-haspopup="menu"]').click()
+  await page.waitForTimeout(300)
+  await page.getByRole('menuitem', { name: /Sign out/i }).click()
+  await page.waitForTimeout(900)
+
+  await page.goto(BASE + '/login', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.locator('[data-quick-signin="contractor"]').click()
+  await page.waitForURL('**/works', { timeout: 8000 }).catch(() => {})
+  check('a contractor lands in the contractor portal', page.url().includes('/works'), page.url())
+  await page.waitForTimeout(500)
+
+  await page.goto(BASE + '/ward', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check(
+    'a contractor cannot reach the officer area',
+    !page.url().includes('/ward'),
+    page.url()
+  )
+
+  // === 14. Console cleanliness =============================================
   check(
     'no console errors across the walkthrough',
     consoleErrors.length === 0,

@@ -183,9 +183,9 @@ export function selectAuditLog(state) {
 }
 
 /**
- * Which projects can a contractor still file against, and which await an
- * inspection? Used to seed sensible defaults in the two action portals so a
- * demo does not require the operator to know the data model.
+ * Which projects can a contractor still report against, and which await a
+ * measurement? Used to seed sensible defaults in the two action portals, so an
+ * operator does not need to know the data model to use them.
  */
 export function selectWorkQueues(state, projectViews) {
   const projects = projectViews ?? selectProjectViews(state)

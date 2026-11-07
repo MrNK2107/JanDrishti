@@ -1,33 +1,26 @@
 /**
- * Seeded demo state for JanDrishti.
+ * Ward 12 — initial dataset.
  *
- * This is a competition demo, not a deployed system. Rather than talk to a
- * Supabase instance that would add signup, network, and CORS failure modes on
- * demo day, the app runs against this seed held in a reducer. The reconciliation
- * logic it drives is real — see `src/domain/reconcile.js`.
+ * The records the application starts from: three sanctioned projects, their
+ * reported figures, and the inspections on file. In a deployed system this would
+ * arrive from the municipal works register; here it is the starting state the
+ * mock backend loads into its store.
  *
  * The three projects are chosen to exercise the full lifecycle, one state each:
  *
- *   T Nagar    — FLAGGED.   Contractor claims 500m, inspector observed 320m.
- *                            This is the case study the demo narrative is built
- *                            around, so it is seeded already-flagged.
- *   Anna Nagar — VERIFIED.  Claim and observation agree within tolerance.
- *                            Shows what a healthy record looks like.
- *   Saidapet   — AWAITING.  Report on file, no inspection yet. This is the
- *                            entry point for the live walkthrough: the user
- *                            files an observation and watches the system
- *                            decide, rather than being shown a verdict.
+ *   T Nagar    — FLAGGED.   Contractor reported 500m, inspection observed 320m.
+ *   Anna Nagar — VERIFIED.  Report and observation agree within tolerance.
+ *   Saidapet   — AWAITING.  Report on file, no inspection yet.
  *
- * Timestamps are fixed rather than relative to `Date.now()`. A demo whose
- * records are stamped with machine-relative times produces different output on
- * every run, which makes tests non-deterministic and screenshots impossible to
- * reproduce.
+ * Timestamps are fixed rather than relative to `Date.now()`. Records whose dates
+ * shift on every run make output non-reproducible, which breaks both tests and
+ * screenshots.
  */
 
 export const SEED_TIMESTAMP = '2026-11-06T14:30:00+05:30'
 
-/** Reference "now" for the demo. Kept explicit so elapsed-time labels are stable. */
-export const DEMO_NOW = '2026-11-06T18:00:00+05:30'
+/** Reference point for records created by user actions. Fixed for reproducibility. */
+export const RECORD_NOW = '2026-11-06T18:00:00+05:30'
 
 const t = (hoursFromSeed) => {
   const base = new Date(SEED_TIMESTAMP).getTime()
