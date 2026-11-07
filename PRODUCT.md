@@ -8,7 +8,16 @@ web
 
 ## Stack
 
-React + Vite + Tailwind CSS + Supabase (PostgreSQL, PostGIS, Auth, Storage). Chosen for rapid MVP delivery with modern DX, comprehensive backend services, and geospatial support.
+**Intended:** React + Vite + Tailwind CSS + Supabase (PostgreSQL, PostGIS, Auth,
+Storage). Chosen for rapid MVP delivery with modern DX, comprehensive backend
+services, and geospatial support.
+
+> **Read this as a design document, not a description of the build.** It records
+> what the product was specified to be. As implemented, the frontend matches —
+> React, Vite, Tailwind — but **Supabase is not wired up**: there is no database,
+> auth, or storage in the running app. [`STATUS.md`](STATUS.md) states what
+> actually exists; [`DECISIONS.md`](DECISIONS.md) explains why the backend was
+> deferred.
 
 ## Users
 
