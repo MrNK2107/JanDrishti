@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reducer } from './StoreProvider'
+import { reducer, STORAGE_KEY } from './StoreProvider'
 import { createSeedState } from '../domain/seed'
 import { selectProjectViews, selectMilestoneViews, selectSummary } from '../domain/selectors'
 
@@ -360,6 +360,55 @@ describe('RESET_DEMO', () => {
     const a = reducer(fresh(), { type: 'RESET_DEMO' })
     const b = reducer(fresh(), { type: 'RESET_DEMO' })
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
+  })
+})
+
+describe('state is serialisable for persistence', () => {
+  /**
+   * The SPA has no backend, so state is held in sessionStorage to survive a
+   * reload. If any part of the state tree were non-serialisable — a function, a
+   * Date, a Map — the round trip would silently corrupt the store on reload.
+   */
+  it('survives a JSON round trip unchanged', () => {
+    let state = fresh()
+    state = reducer(state, {
+      type: 'RECORD_INSPECTION',
+      payload: {
+        projectId: 'JDT-2026-0152',
+        milestoneId: 'MS-1',
+        observedQuantity: 90,
+        inspectedBy: 'Insp. R. Karthikeyan',
+      },
+    })
+
+    const restored = JSON.parse(JSON.stringify(state))
+    expect(restored).toEqual(state)
+    expect(restored.discrepancies).toHaveLength(2)
+  })
+
+  it('preserves derived status across a round trip', () => {
+    let state = fresh()
+    state = reducer(state, {
+      type: 'RECORD_INSPECTION',
+      payload: {
+        projectId: 'JDT-2026-0152',
+        milestoneId: 'MS-1',
+        observedQuantity: 90,
+        inspectedBy: 'Insp. R. Karthikeyan',
+      },
+    })
+
+    const before = selectProjectViews(state).find((p) => p.id === 'JDT-2026-0152')
+    const after = selectProjectViews(JSON.parse(JSON.stringify(state))).find(
+      (p) => p.id === 'JDT-2026-0152'
+    )
+
+    expect(after.status).toBe(before.status)
+    expect(after.counts.open).toBe(before.counts.open)
+  })
+
+  it('exposes a versioned storage key so a seed change cannot hydrate stale state', () => {
+    expect(STORAGE_KEY).toMatch(/^jandrishti\.state\.v\d+$/)
   })
 })
 

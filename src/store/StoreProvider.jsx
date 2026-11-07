@@ -22,12 +22,58 @@
  * removed — that is the "traceability" principle made concrete.
  */
 
-import { createContext, useContext, useMemo, useReducer } from 'react'
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { createSeedState, DEMO_NOW } from '../domain/seed'
 import { deviations } from '../domain/reconcile'
 import { selectMilestoneViews, selectProjectViews } from '../domain/selectors'
 
 const StoreContext = createContext(null)
+
+/**
+ * Session storage key, versioned.
+ *
+ * The app is a client-side SPA with no backend, so an in-memory store is lost
+ * on every page load — and because navigating to a route directly is a full
+ * document request, *any* hard navigation would silently discard every claim,
+ * observation, and finding recorded so far. During a live walkthrough that is
+ * a disaster: one refresh and the demo is back to seed.
+ *
+ * `sessionStorage` is the right scope rather than `localStorage`. It survives
+ * reloads and hard navigation within the tab, which is what a demo needs, but
+ * it does not leak yesterday's playthrough into a fresh tab.
+ *
+ * The version suffix means a change to the seed shape discards stale state
+ * instead of hydrating a store that no longer matches the code.
+ */
+export const STORAGE_KEY = 'jandrishti.state.v1'
+
+/** Read persisted state, or null if absent/corrupt/from another version. */
+function loadPersistedState() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    // Minimal shape validation: a half-written record must not crash the app.
+    if (!parsed || !Array.isArray(parsed.projects) || !Array.isArray(parsed.discrepancies)) {
+      return null
+    }
+    if (!Array.isArray(parsed.auditLog)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function persistState(state) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Storage can be unavailable (private mode, quota). Losing persistence is
+    // an acceptable degradation; losing the session is not.
+  }
+}
 
 /** Deterministic id generation — counters, not randomness, so runs are reproducible. */
 const nextId = (prefix, existing, width = 4) =>
@@ -330,11 +376,34 @@ function hashish(input) {
 }
 
 export function StoreProvider({ children, initialState }) {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => init ?? createSeedState())
+  const [state, dispatch] = useReducer(
+    reducer,
+    initialState,
+    // Explicit initial state (tests) wins; otherwise resume the session, and
+    // only fall back to the seed when there is nothing to resume.
+    (init) => init ?? loadPersistedState() ?? createSeedState()
+  )
+
+  // Persist on every transition. `RESET_DEMO` writes the fresh seed back, so a
+  // reset is durable rather than being undone by the next reload.
+  useEffect(() => {
+    persistState(state)
+  }, [state])
 
   // Derived views. Recomputed when state changes, memoised per state identity.
   const projectViews = useMemo(() => selectProjectViews(state), [state])
   const milestoneViews = useMemo(() => selectMilestoneViews(state), [state])
+
+  // Expose the store for end-to-end verification. The browser check in
+  // tools/verify-browser.mjs needs to assert on records, not on whether a
+  // particular string happened to appear somewhere in the DOM.
+  if (typeof window !== 'undefined') {
+    window.__JANDRISHTI__ = {
+      getState: () => state,
+      discrepancies: () => state.discrepancies,
+      audit: () => state.auditLog,
+    }
+  }
 
   const value = useMemo(
     () => ({ state, dispatch, projectViews, milestoneViews }),
